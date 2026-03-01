@@ -64,9 +64,10 @@ let lastProcessedEventId = -1
 let consecutiveErrors = 0
 const ERRORS_BEFORE_END = 3
 
-// Throttle : ne pas broadcasté la même donnée à chaque poll
+// Throttle : ne pas broadcaster la même donnée à chaque poll
 let lastBroadcastedTip = ''
 let lastBroadcastedBuildKey = ''
+let lastGameDataKey = ''
 
 // Résultat de fin de partie (détecté via GameEnd event)
 let lastGameResult: 'win' | 'loss' | null = null
@@ -277,6 +278,7 @@ async function poll(): Promise<void> {
       lastProcessedEventId = -1
       lastBroadcastedTip = ''
       lastBroadcastedBuildKey = ''
+      lastGameDataKey = ''
       activeReviewTimeline = null
       lastBroadcastedReviewIdx = -1
 
@@ -329,7 +331,14 @@ async function poll(): Promise<void> {
       processNewEvents(raw.events, gameData)
       updateGameData(gameData)
     }
-    broadcastToWindows(IPC.GAME_DATA, gameData)
+
+    // Ne broadcaster GAME_DATA que si les stats importantes ont changé
+    // (le timer de jeu est géré par StatsOverlay avec sa propre horloge)
+    const dataKey = `${gameData.kda.kills}:${gameData.kda.deaths}:${gameData.kda.assists}:${gameData.cs}:${gameData.gold}:${gameData.level}:${gameData.items.length}:${gameData.teamKills}:${gameData.matchup?.levelDiff ?? 0}`
+    if (dataKey !== lastGameDataKey) {
+      lastGameDataKey = dataKey
+      broadcastToWindows(IPC.GAME_DATA, gameData)
+    }
 
     // Garder les dernières gameData pour sauvegarde ranked en fin de partie
     lastGameData = gameData
@@ -429,6 +438,7 @@ async function poll(): Promise<void> {
       consecutiveErrors = 0
       lastBroadcastedTip = ''
       lastBroadcastedBuildKey = ''
+      lastGameDataKey = ''
       lastGameResult = null
       lastGameData = null
       const status: GameStatus = { isInGame: false }

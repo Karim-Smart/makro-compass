@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from 'react'
 import type { GameData } from '../../../shared/types'
 
 interface Props {
@@ -6,20 +7,37 @@ interface Props {
 }
 
 export function StatsOverlay({ gameData, colors }: Props) {
-  const csPerMin = gameData.gameTime > 0
-    ? (gameData.cs / (gameData.gameTime / 60)).toFixed(1)
+  // Horloge interne lisse : interpolation entre les polls (tous les 5s)
+  const [displayTime, setDisplayTime] = useState(gameData.gameTime)
+  const baseRef = useRef({ gameTime: gameData.gameTime, receivedAt: Date.now() })
+
+  useEffect(() => {
+    baseRef.current = { gameTime: gameData.gameTime, receivedAt: Date.now() }
+    setDisplayTime(gameData.gameTime)
+  }, [gameData.gameTime])
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const elapsed = (Date.now() - baseRef.current.receivedAt) / 1000
+      setDisplayTime(baseRef.current.gameTime + elapsed)
+    }, 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  const csPerMin = displayTime > 0
+    ? (gameData.cs / (displayTime / 60)).toFixed(1)
     : '0.0'
 
   const kdaRatio = gameData.kda.deaths === 0
     ? '∞'
     : ((gameData.kda.kills + gameData.kda.assists) / gameData.kda.deaths).toFixed(1)
 
-  const minutes = Math.floor(gameData.gameTime / 60)
-  const seconds = Math.floor(gameData.gameTime % 60)
+  const minutes = Math.floor(displayTime / 60)
+  const seconds = Math.floor(displayTime % 60)
   const timeStr = `${minutes}:${String(seconds).padStart(2, '0')}`
 
   // Phase de jeu
-  const phase = gameData.gameTime < 840 ? 'EARLY' : gameData.gameTime < 1500 ? 'MID' : 'LATE'
+  const phase = displayTime < 840 ? 'EARLY' : displayTime < 1500 ? 'MID' : 'LATE'
 
   // Kill participation
   const kp = gameData.teamKills > 0

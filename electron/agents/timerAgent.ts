@@ -23,6 +23,15 @@ let broadcastTimer: ReturnType<typeof setInterval> | null = null
 let gameStartTime: number | null = null
 let dragonStacks = 0
 let lastObjectiveEvents: ObjectiveEvent[] = []
+let lastTimerSig = ''
+
+function timerSig(t: ObjectiveTimers): string {
+  return [
+    `${+t.dragon.isDead}:${t.dragon.nextSpawn}`,
+    `${+t.baron.isDead}:${t.baron.nextSpawn}:${+t.baron.available}`,
+    `${+t.herald.isDead}:${t.herald.nextSpawn}:${+t.herald.available}`,
+  ].join('|')
+}
 
 // ─── API publique (appelée par riotAgent) ─────────────────────────────────────
 
@@ -49,6 +58,7 @@ export function resetTimers(): void {
   dragonStacks = 0
   lastObjectiveEvents = []
   gameStartTime = null
+  lastTimerSig = ''
 }
 
 // ─── Calcul des timers ────────────────────────────────────────────────────────
@@ -112,13 +122,18 @@ function computeTimers(currentGameTime: number): ObjectiveTimers {
 export async function startTimerAgent(): Promise<void> {
   console.log('[TimerAgent] Démarrage.')
 
-  // Mise à jour des timers toutes les secondes
+  // Mise à jour des timers toutes les secondes — broadcaster seulement si l'état change
+  // (TimerOverlay a son propre useNow(500) pour le décompte, pas besoin de spam IPC)
   broadcastTimer = setInterval(() => {
     if (!gameStartTime) return
 
     const currentGameTime = (Date.now() - gameStartTime) / 1000
     const timers = computeTimers(currentGameTime)
-    broadcastToWindows(IPC.OVERLAY_TIMERS, timers)
+    const sig = timerSig(timers)
+    if (sig !== lastTimerSig) {
+      lastTimerSig = sig
+      broadcastToWindows(IPC.OVERLAY_TIMERS, timers)
+    }
   }, 1000)
 }
 
