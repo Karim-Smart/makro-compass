@@ -3,7 +3,7 @@ import { useCoachingStore } from '../stores/coachingStore'
 import { COACHING_STYLES } from '../../../shared/constants'
 import { IPC } from '../../../shared/ipc-channels'
 import { getChampionIconUrl } from '../../../shared/champion-images'
-import type { RankedGame, RankedQueueType } from '../../../shared/types'
+import type { RankedGame, RankedQueueType, ReviewTimeline, ReviewEvent } from '../../../shared/types'
 
 type QueueTab = 'RANKED_SOLO' | 'RANKED_FLEX'
 
@@ -38,6 +38,13 @@ export default function Stats() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<QueueTab>('RANKED_SOLO')
 
+  // Review : stocke la timeline générée par gameId (null = pas chargé, 'loading' = en cours)
+  const [reviews, setReviews] = useState<Record<number, ReviewTimeline | 'loading'>>({})
+  // ID de la review ouverte (un seul à la fois)
+  const [openReviewId, setOpenReviewId] = useState<number | null>(null)
+  // Feedback quand le replay est lancé
+  const [launchingReplay, setLaunchingReplay] = useState<number | null>(null)
+
   useEffect(() => {
     setLoading(true)
     window.electronAPI.invoke(IPC.RANKED_HISTORY, tab)
@@ -45,6 +52,36 @@ export default function Stats() {
       .catch(() => setGames([]))
       .finally(() => setLoading(false))
   }, [tab])
+
+  // Génère (ou toggle) la review d'une partie
+  async function handleAnalyse(gameId: number) {
+    if (openReviewId === gameId) {
+      setOpenReviewId(null)
+      return
+    }
+    setOpenReviewId(gameId)
+    if (reviews[gameId]) return  // déjà chargé
+    setReviews((prev) => ({ ...prev, [gameId]: 'loading' }))
+    try {
+      const timeline = await window.electronAPI.invoke(IPC.REVIEW_GENERATE, gameId) as ReviewTimeline | null
+      if (timeline) {
+        setReviews((prev) => ({ ...prev, [gameId]: timeline }))
+      } else {
+        setReviews((prev) => { const next = { ...prev }; delete next[gameId]; return next })
+        setOpenReviewId(null)
+      }
+    } catch {
+      setReviews((prev) => { const next = { ...prev }; delete next[gameId]; return next })
+      setOpenReviewId(null)
+    }
+  }
+
+  // Lance le replay via le client LoL
+  async function handleLaunchReplay(gameId: number) {
+    setLaunchingReplay(gameId)
+    await window.electronAPI.invoke(IPC.LAUNCH_REPLAY, gameId)
+    setTimeout(() => setLaunchingReplay(null), 3000)
+  }
 
   const wins = games.filter((g) => g.result === 'win').length
   const losses = games.filter((g) => g.result === 'loss').length
@@ -150,10 +187,15 @@ export default function Stats() {
                 ? Math.round(((game.kills + game.assists) / game.teamKills) * 100)
                 : 0
 
+              const isReviewOpen = openReviewId === game.id
+              const review = reviews[game.id]
+              const reviewLoading = review === 'loading'
+              const reviewData = review && review !== 'loading' ? review : null
+
               return (
                 <div
                   key={game.id}
-                  className="rounded-xl p-3.5 relative overflow-hidden"
+                  className="rounded-xl overflow-hidden"
                   style={{
                     background: `linear-gradient(135deg, ${c.bg} 0%, ${c.border}30 100%)`,
                     border: `1px solid ${c.border}`,
@@ -161,6 +203,7 @@ export default function Stats() {
                     borderLeftColor: isWin ? '#22c55e' : '#ef4444',
                   }}
                 >
+                <div className="p-3.5 relative">
                   {/* Ligne 1 : Champion + Résultat + KDA + Meta */}
                   <div className="flex items-center gap-3">
                     {/* Champion icon */}
@@ -243,32 +286,47 @@ export default function Stats() {
                     "{game.roast}"
                   </div>
 
-                  {/* Ligne 3 : Equipes compactes */}
-                  <div
-                    className="mt-2 flex items-center gap-1 flex-wrap"
-                    style={{ opacity: 0.4 }}
-                  >
-                    <span className="text-[8px] font-bold" style={{ color: '#22c55e' }}>Allies:</span>
-                    {game.allies.map((a, i) => (
-                      <img
-                        key={i}
-                        src={getChampionIconUrl(a)}
-                        alt={a}
-                        title={a}
-                        className="w-4 h-4 rounded-sm"
-                      />
-                    ))}
-                    <span className="text-[8px] font-bold ml-2" style={{ color: '#ef4444' }}>vs</span>
-                    {game.enemies.map((e, i) => (
-                      <img
-                        key={i}
-                        src={getChampionIconUrl(e)}
-                        alt={e}
-                        title={e}
-                        className="w-4 h-4 rounded-sm"
-                      />
-                    ))}
+                  {/* Ligne 3 : Equipes + bouton Analyser */}
+                  <div className="mt-2 flex items-center gap-1 flex-wrap">
+                    <div className="flex items-center gap-1 flex-wrap" style={{ opacity: 0.4 }}>
+                      <span className="text-[8px] font-bold" style={{ color: '#22c55e' }}>Allies:</span>
+                      {game.allies.map((a, i) => (
+                        <img key={i} src={getChampionIconUrl(a)} alt={a} title={a} className="w-4 h-4 rounded-sm" />
+                      ))}
+                      <span className="text-[8px] font-bold ml-2" style={{ color: '#ef4444' }}>vs</span>
+                      {game.enemies.map((e, i) => (
+                        <img key={i} src={getChampionIconUrl(e)} alt={e} title={e} className="w-4 h-4 rounded-sm" />
+                      ))}
+                    </div>
+
+                    {/* Bouton Analyser */}
+                    <button
+                      onClick={() => handleAnalyse(game.id)}
+                      className="ml-auto text-[9px] font-bold px-2.5 py-1 rounded-full transition-all duration-150"
+                      style={isReviewOpen ? {
+                        backgroundColor: c.accent,
+                        color: c.bg,
+                      } : {
+                        backgroundColor: `${c.border}60`,
+                        color: c.text,
+                        opacity: 0.7,
+                      }}
+                    >
+                      {reviewLoading ? '...' : isReviewOpen ? '▲ Review' : '▼ Analyser'}
+                    </button>
                   </div>
+                </div>
+
+                {/* ── Panneau review inline ── */}
+                {isReviewOpen && reviewData && (
+                  <ReviewPanel
+                    timeline={reviewData}
+                    gameId={game.id}
+                    launchingReplay={launchingReplay}
+                    onLaunchReplay={handleLaunchReplay}
+                    colors={c}
+                  />
+                )}
                 </div>
               )
             })}
@@ -276,6 +334,122 @@ export default function Stats() {
         )}
       </div>
 
+    </div>
+  )
+}
+
+// ─── Composant panneau review inline ────────────────────────────────────────
+
+const GRADE_COLOR: Record<string, string> = {
+  S: '#facc15', A: '#22c55e', B: '#60a5fa', C: '#f59e0b', D: '#ef4444',
+}
+
+const EVENT_COLOR: Record<string, string> = {
+  error: '#ef4444', strength: '#22c55e', tip: '#f59e0b',
+}
+
+const EVENT_ICON: Record<string, string> = {
+  error: '✕', strength: '✓', tip: '◆',
+}
+
+interface ReviewPanelProps {
+  timeline: ReviewTimeline
+  gameId: number
+  launchingReplay: number | null
+  onLaunchReplay: (id: number) => void
+  colors: { bg: string; text: string; accent: string; border: string }
+}
+
+function ReviewPanel({ timeline, gameId, launchingReplay, onLaunchReplay, colors }: ReviewPanelProps) {
+  const { summary } = timeline
+  const gradeColor = GRADE_COLOR[summary.grade] ?? '#fff'
+  const isLaunching = launchingReplay === gameId
+
+  return (
+    <div
+      className="px-4 pt-3 pb-4"
+      style={{ borderTop: `1px solid ${colors.border}40` }}
+    >
+      {/* ── En-tête grade + résumé + bouton replay ── */}
+      <div className="flex items-start gap-3 mb-3">
+        {/* Grade */}
+        <div
+          className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-xl font-black"
+          style={{
+            backgroundColor: `${gradeColor}18`,
+            border: `2px solid ${gradeColor}50`,
+            color: gradeColor,
+          }}
+        >
+          {summary.grade}
+        </div>
+
+        {/* Résumé texte */}
+        <p className="flex-1 text-[11px] leading-relaxed" style={{ color: colors.text, opacity: 0.8 }}>
+          {summary.summary}
+        </p>
+
+        {/* Bouton Rejouer */}
+        <button
+          onClick={() => onLaunchReplay(gameId)}
+          disabled={isLaunching}
+          className="flex-shrink-0 text-[9px] font-bold px-2.5 py-1.5 rounded-lg transition-all duration-150"
+          style={{
+            backgroundColor: isLaunching ? `${colors.accent}30` : `${colors.accent}20`,
+            color: isLaunching ? colors.accent : colors.accent,
+            border: `1px solid ${colors.accent}40`,
+            opacity: isLaunching ? 0.6 : 1,
+          }}
+        >
+          {isLaunching ? 'Lancement...' : '▶ Rejouer'}
+        </button>
+      </div>
+
+      {/* ── Stats chiffrées ── */}
+      <div
+        className="grid grid-cols-3 gap-2 mb-3 rounded-lg p-2.5"
+        style={{ backgroundColor: `${colors.border}30` }}
+      >
+        {([
+          { label: 'KDA',      value: summary.stats.kda },
+          { label: 'CS/min',   value: summary.stats.csPerMin },
+          { label: 'KP',       value: `${summary.stats.kp}%` },
+          { label: 'Gold/min', value: summary.stats.goldPerMin },
+          { label: 'Vision',   value: summary.stats.wardScore },
+          { label: 'Morts',    value: `${summary.stats.deathsEarly}/${summary.stats.deathsMid}/${summary.stats.deathsLate}` },
+        ] as { label: string; value: string | number }[]).map(({ label, value }) => (
+          <div key={label} className="text-center">
+            <p className="text-xs font-bold text-white">{value}</p>
+            <p className="text-[9px]" style={{ color: colors.text, opacity: 0.4 }}>{label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Événements par catégorie ── */}
+      <div className="space-y-1.5">
+        {[...summary.errors, ...summary.strengths, ...summary.tips].map((ev: ReviewEvent, i: number) => (
+          <div
+            key={i}
+            className="flex items-start gap-2 rounded-lg px-2.5 py-2"
+            style={{ backgroundColor: `${EVENT_COLOR[ev.category]}10` }}
+          >
+            <span
+              className="flex-shrink-0 text-[10px] font-black mt-0.5"
+              style={{ color: EVENT_COLOR[ev.category] }}
+            >
+              {EVENT_ICON[ev.category]}
+            </span>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold" style={{ color: EVENT_COLOR[ev.category] }}>
+                {ev.title}
+              </p>
+              <p className="text-[10px] leading-relaxed" style={{ color: colors.text, opacity: 0.7 }}>
+                {ev.description}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

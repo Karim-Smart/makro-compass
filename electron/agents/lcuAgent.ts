@@ -34,6 +34,8 @@ let wasInChampSelect = false
 let connectionAttempts = 0
 let lastAutoImportChampion = ''
 let lastDetectedQueueId: number | null = null
+let isReplayMode = false
+let gameflowPollTimer: ReturnType<typeof setInterval> | null = null
 
 function detectLcuHost(): string {
   // Si Electron tourne sur Windows (même lancé depuis WSL2), utiliser localhost
@@ -219,6 +221,66 @@ export async function detectCurrentQueueType(): Promise<void> {
   }
 }
 
+// ─── Replay mode detection ──────────────────────────────────────────────────
+
+/**
+ * Retourne true si le client LoL est en mode replay (WatchInProgress).
+ */
+export function isInReplayMode(): boolean {
+  return isReplayMode
+}
+
+/**
+ * Lancer un replay via LCU API.
+ */
+export async function launchReplay(gameId: number): Promise<boolean> {
+  if (!lcuPort || !lcuPassword) {
+    console.warn('[LCUAgent] Impossible de lancer le replay — client non connecté')
+    return false
+  }
+
+  try {
+    await lcuHttpClient.post(
+      getLcuUrl(`/lol-replays/v1/rofls/${gameId}/watch`),
+      {},
+      { headers: { ...getLcuHeaders(), 'Content-Type': 'application/json' } },
+    )
+    console.log(`[LCUAgent] Replay lancé pour gameId=${gameId}`)
+    return true
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.warn(`[LCUAgent] Erreur lancement replay: ${msg}`)
+    return false
+  }
+}
+
+/**
+ * Poll le gameflow pour détecter le mode replay (WatchInProgress).
+ */
+async function pollGameflow(): Promise<void> {
+  if (!lcuPort || !lcuPassword) return
+
+  try {
+    const resp = await lcuHttpClient.get(
+      getLcuUrl('/lol-gameflow/v1/gameflow-phase'),
+      { headers: getLcuHeaders() },
+    )
+    const phase = resp.data as string
+
+    if (phase === 'WatchInProgress' && !isReplayMode) {
+      isReplayMode = true
+      broadcastToWindows(IPC.REPLAY_DETECTED, { isReplay: true })
+      console.log('[LCUAgent] Mode Replay détecté (WatchInProgress)')
+    } else if (phase !== 'WatchInProgress' && isReplayMode) {
+      isReplayMode = false
+      broadcastToWindows(IPC.REPLAY_DETECTED, { isReplay: false })
+      console.log('[LCUAgent] Fin du mode Replay')
+    }
+  } catch {
+    // Pas connecté au gameflow, on ignore
+  }
+}
+
 // ─── Polling champion select ────────────────────────────────────────────────
 
 interface LcuChampSelectSession {
@@ -334,6 +396,7 @@ export async function startLcuAgent(): Promise<void> {
         await fetchChampionMap()
         if (retryTimer) { clearInterval(retryTimer); retryTimer = null }
         pollTimer = setInterval(poll, LCU_POLL_MS)
+        gameflowPollTimer = setInterval(pollGameflow, 5000)
       } else if (connectionAttempts % 10 === 0) {
         console.debug(`[LCUAgent] Toujours pas de client (${connectionAttempts} tentatives)`)
       }
@@ -351,6 +414,7 @@ export async function startLcuAgent(): Promise<void> {
 
   // Commencer le polling
   pollTimer = setInterval(poll, LCU_POLL_MS)
+  gameflowPollTimer = setInterval(pollGameflow, 5000)
 }
 
 export function stopLcuAgent(): void {
@@ -362,8 +426,13 @@ export function stopLcuAgent(): void {
     clearInterval(pollTimer)
     pollTimer = null
   }
+  if (gameflowPollTimer) {
+    clearInterval(gameflowPollTimer)
+    gameflowPollTimer = null
+  }
   lcuPort = null
   lcuPassword = null
   lastAutoImportChampion = ''
+  isReplayMode = false
   console.log('[LCUAgent] Arrêté.')
 }

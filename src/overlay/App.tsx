@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { IPC } from '../../shared/ipc-channels'
 import { COACHING_STYLES } from '../../shared/constants'
-import type { CoachAdvice, CoachingStyle, GameAlert, GameData, GameStatus, ObjectiveTimers, RunePageSet, BuildRecommendations } from '../../shared/types'
+import type { CoachAdvice, CoachingStyle, GameAlert, GameData, GameStatus, ObjectiveTimers, RunePageSet, BuildRecommendations, ReviewEvent } from '../../shared/types'
 import { AdviceOverlay } from './components/AdviceOverlay'
 import { AdviceMinBar } from './components/AdviceMinBar'
 import { TimerOverlay } from './components/TimerOverlay'
@@ -13,6 +13,7 @@ import { AlertOverlay } from './components/AlertOverlay'
 import { StyleSwitcher } from './components/StyleSwitcher'
 import { RunesOverlay } from './components/RunesOverlay'
 import { BuildStrip } from './components/BuildStrip'
+import { ReviewEventOverlay } from './components/ReviewEventOverlay'
 
 // Lire le panel à afficher depuis l'URL (?panel=stats|timers|advice)
 const params = new URLSearchParams(window.location.search)
@@ -31,6 +32,13 @@ export default function OverlayApp() {
   // Runes et Build
   const [runePages, setRunePages] = useState<RunePageSet | null>(null)
   const [buildData, setBuildData] = useState<BuildRecommendations | null>(null)
+
+  // Review mode (replay coaching)
+  const [isReplayMode, setIsReplayMode] = useState(false)
+  const [reviewEvent, setReviewEvent] = useState<ReviewEvent | null>(null)
+  const [reviewEventIndex, setReviewEventIndex] = useState(0)
+  const [reviewTotalEvents, setReviewTotalEvents] = useState(0)
+  const reviewEventTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Minimize/expand du panneau advice
   const [adviceMinimized, setAdviceMinimized] = useState(false)
@@ -119,6 +127,37 @@ export default function OverlayApp() {
       setBuildData(data as BuildRecommendations)
     }
 
+    const onReplayDetected = (payload: unknown) => {
+      const { isReplay } = payload as { isReplay: boolean }
+      setIsReplayMode(isReplay)
+      if (!isReplay) {
+        // Fin du replay → nettoyer l'état review
+        setReviewEvent(null)
+        setReviewEventIndex(0)
+        setReviewTotalEvents(0)
+        if (reviewEventTimerRef.current) clearTimeout(reviewEventTimerRef.current)
+      }
+    }
+
+    const onOverlayReview = (payload: unknown) => {
+      const p = payload as {
+        type: 'event' | 'summary'
+        event?: ReviewEvent
+        eventIndex?: number
+        totalEvents?: number
+      }
+      if (p.type === 'event' && p.event) {
+        if (reviewEventTimerRef.current) clearTimeout(reviewEventTimerRef.current)
+        setReviewEvent(p.event)
+        setReviewEventIndex(p.eventIndex ?? 0)
+        setReviewTotalEvents(p.totalEvents ?? 1)
+        // Masquer après la durée de l'événement
+        reviewEventTimerRef.current = setTimeout(() => {
+          setReviewEvent(null)
+        }, p.event.gameTimeDuration * 1000)
+      }
+    }
+
     api.on(IPC.STYLE_CHANGE, onStyleChange)
     api.on(IPC.OVERLAY_SHOW_ADVICE, onAdvice)
     api.on(IPC.OVERLAY_SHOW_ALERT, onAlert)
@@ -127,10 +166,13 @@ export default function OverlayApp() {
     api.on(IPC.OVERLAY_TIMERS, onTimers)
     api.on(IPC.OVERLAY_RUNES, onRunes)
     api.on(IPC.OVERLAY_BUILD, onBuild)
+    api.on(IPC.REPLAY_DETECTED, onReplayDetected)
+    api.on(IPC.OVERLAY_REVIEW, onOverlayReview)
 
     return () => {
       if (rotateTimerRef.current) clearInterval(rotateTimerRef.current)
       if (alertTimeoutRef.current) clearTimeout(alertTimeoutRef.current)
+      if (reviewEventTimerRef.current) clearTimeout(reviewEventTimerRef.current)
       // Nettoyer les listeners IPC pour éviter les fuites mémoire
       api.removeListener(IPC.STYLE_CHANGE, onStyleChange)
       api.removeListener(IPC.OVERLAY_SHOW_ADVICE, onAdvice)
@@ -140,6 +182,8 @@ export default function OverlayApp() {
       api.removeListener(IPC.OVERLAY_TIMERS, onTimers)
       api.removeListener(IPC.OVERLAY_RUNES, onRunes)
       api.removeListener(IPC.OVERLAY_BUILD, onBuild)
+      api.removeListener(IPC.REPLAY_DETECTED, onReplayDetected)
+      api.removeListener(IPC.OVERLAY_REVIEW, onOverlayReview)
     }
   }, [])
 
@@ -186,34 +230,49 @@ export default function OverlayApp() {
 
       {panel === 'advice' && (
         <div className="flex flex-col gap-1">
-          {/* Alerte courte (3s) — priorité visuelle (toujours visible) */}
-          {alert && <AlertOverlay alert={alert} />}
-
-          {/* Minimized → barre compacte */}
-          {!alert && adviceMinimized && (
-            <AdviceMinBar
-              advice={currentAdvice}
+          {/* ── Mode Replay : afficher les événements de review ── */}
+          {isReplayMode && reviewEvent && (
+            <ReviewEventOverlay
+              event={reviewEvent}
+              eventIndex={reviewEventIndex}
+              totalEvents={reviewTotalEvents}
               colors={colors}
-              queueTotal={adviceQueue.length}
-              onExpand={() => setAdviceMinimized(false)}
             />
           )}
 
-          {/* Expanded → panneau conseil complet */}
-          {!alert && !adviceMinimized && currentAdvice && (
-            <AdviceOverlay
-              advice={currentAdvice}
-              colors={colors}
-              queuePos={safeIdx + 1}
-              queueTotal={adviceQueue.length}
-              rotateKey={rotateKey}
-              onMinimize={() => setAdviceMinimized(true)}
-            />
-          )}
+          {/* ── Mode Live : conseil IA normal ── */}
+          {!isReplayMode && (
+            <>
+              {/* Alerte courte (3s) — priorité visuelle (toujours visible) */}
+              {alert && <AlertOverlay alert={alert} />}
 
-          {/* Alerte niveau matchup — visible quand pas de conseil ni d'alerte ni minimized */}
-          {!currentAdvice && !alert && !adviceMinimized && inGame && gameData!.matchup && gameData!.matchup.levelDiff !== 0 && (
-            <LevelAlert gameData={gameData!} colors={colors} />
+              {/* Minimized → barre compacte */}
+              {!alert && adviceMinimized && (
+                <AdviceMinBar
+                  advice={currentAdvice}
+                  colors={colors}
+                  queueTotal={adviceQueue.length}
+                  onExpand={() => setAdviceMinimized(false)}
+                />
+              )}
+
+              {/* Expanded → panneau conseil complet */}
+              {!alert && !adviceMinimized && currentAdvice && (
+                <AdviceOverlay
+                  advice={currentAdvice}
+                  colors={colors}
+                  queuePos={safeIdx + 1}
+                  queueTotal={adviceQueue.length}
+                  rotateKey={rotateKey}
+                  onMinimize={() => setAdviceMinimized(true)}
+                />
+              )}
+
+              {/* Alerte niveau matchup */}
+              {!currentAdvice && !alert && !adviceMinimized && inGame && gameData!.matchup && gameData!.matchup.levelDiff !== 0 && (
+                <LevelAlert gameData={gameData!} colors={colors} />
+              )}
+            </>
           )}
         </div>
       )}

@@ -14,8 +14,10 @@ import { generateMacroTip, trackObjectiveKill, resetMacroEngine } from './macroT
 import { detectAlerts, resetAlertEngine } from './alertEngine'
 import { generateBuildRecommendations } from './buildEngine'
 import { generateRunePages } from '../../shared/rune-data'
-import { getLastQueueType, detectCurrentQueueType } from './lcuAgent'
-import { saveRankedGame } from './quotaManager'
+import { getLastQueueType, detectCurrentQueueType, isInReplayMode } from './lcuAgent'
+import { saveRankedGame, getRankedHistory } from './quotaManager'
+import { generateReviewTimeline } from './reviewEngine'
+import type { ReviewTimeline, ReviewEvent, RankedGame } from '../../shared/types'
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -69,6 +71,10 @@ let lastBroadcastedBuildKey = ''
 // Résultat de fin de partie (détecté via GameEnd event)
 let lastGameResult: 'win' | 'loss' | null = null
 let lastGameData: GameData | null = null
+
+// Review mode state
+let activeReviewTimeline: ReviewTimeline | null = null
+let lastBroadcastedReviewIdx = -1
 
 // ─── Parsing enrichi ─────────────────────────────────────────────────────────
 
@@ -264,13 +270,20 @@ async function poll(): Promise<void> {
 
     const gameData = parseGameData(raw)
 
+    const replayMode = isInReplayMode()
+
     if (!wasInGame) {
       wasInGame = true
       lastProcessedEventId = -1
       lastBroadcastedTip = ''
       lastBroadcastedBuildKey = ''
-      resetMacroEngine()
-      resetAlertEngine()
+      activeReviewTimeline = null
+      lastBroadcastedReviewIdx = -1
+
+      if (!replayMode) {
+        resetMacroEngine()
+        resetAlertEngine()
+      }
       const startTimestamp = Date.now() - gameData.gameTime * 1000
       setGameStartTime(startTimestamp)
 
@@ -281,21 +294,41 @@ async function poll(): Promise<void> {
       }
       broadcastToWindows(IPC.GAME_STATUS, status)
       showOverlay()
-      onGameStart(gameData)
 
-      // Broadcast runes au début de partie
-      const style = getCoachingStyle()
-      const runePages = generateRunePages(gameData.champion, style)
-      broadcastToWindows(IPC.OVERLAY_RUNES, runePages)
+      if (replayMode) {
+        // Mode replay : chercher la partie correspondante dans SQLite
+        const rankedGames = getRankedHistory() as RankedGame[]
+        const match = rankedGames.find((g) => g.champion === gameData.champion)
+        if (match) {
+          activeReviewTimeline = generateReviewTimeline(match)
+          broadcastToWindows(IPC.OVERLAY_REVIEW, {
+            type: 'summary',
+            timeline: activeReviewTimeline,
+          })
+          console.log(`[RiotAgent] Review mode — timeline générée pour ${match.champion} (grade: ${activeReviewTimeline.summary.grade})`)
+        } else {
+          console.log('[RiotAgent] Review mode — aucune partie correspondante trouvée')
+        }
+        broadcastToWindows(IPC.REPLAY_DETECTED, { isReplay: true })
+      } else {
+        onGameStart(gameData)
 
-      // Détecter le type de queue (ranked ?) via LCU
-      detectCurrentQueueType()
+        // Broadcast runes au début de partie
+        const style = getCoachingStyle()
+        const runePages = generateRunePages(gameData.champion, style)
+        broadcastToWindows(IPC.OVERLAY_RUNES, runePages)
 
-      console.log(`[RiotAgent] Partie détectée — ${gameData.champion} (${gameData.gameMode})`)
+        // Détecter le type de queue (ranked ?) via LCU
+        detectCurrentQueueType()
+      }
+
+      console.log(`[RiotAgent] ${replayMode ? 'Replay' : 'Partie'} détecté — ${gameData.champion} (${gameData.gameMode})`)
     }
 
-    processNewEvents(raw.events, gameData)
-    updateGameData(gameData)
+    if (!replayMode) {
+      processNewEvents(raw.events, gameData)
+      updateGameData(gameData)
+    }
     broadcastToWindows(IPC.GAME_DATA, gameData)
 
     // Garder les dernières gameData pour sauvegarde ranked en fin de partie
@@ -304,34 +337,59 @@ async function poll(): Promise<void> {
     // Stocker les dernières gameData pour le refresh build
     ;(global as typeof global & { __lastGameData?: GameData }).__lastGameData = gameData
 
-    // Broadcast build recommendations (seulement si le profil change)
-    const currentStyleForBuild = getCoachingStyle()
-    const buildRec = generateBuildRecommendations(gameData, currentStyleForBuild)
-    const buildKey = `${buildRec.enemyProfile.dominantType}-${buildRec.gamePhase}-${buildRec.style}-${gameData.items.length}`
-    if (buildKey !== lastBroadcastedBuildKey) {
-      broadcastToWindows(IPC.OVERLAY_BUILD, buildRec)
-      lastBroadcastedBuildKey = buildKey
-    }
+    if (replayMode) {
+      // Mode replay : broadcaster les ReviewEvents au bon gameTime
+      if (activeReviewTimeline) {
+        const currentTime = gameData.gameTime
+        for (let i = 0; i < activeReviewTimeline.events.length; i++) {
+          const ev = activeReviewTimeline.events[i]
+          if (
+            i > lastBroadcastedReviewIdx &&
+            currentTime >= ev.gameTimeStart &&
+            currentTime <= ev.gameTimeStart + ev.gameTimeDuration
+          ) {
+            broadcastToWindows(IPC.OVERLAY_REVIEW, {
+              type: 'event',
+              event: ev,
+              eventIndex: i,
+              totalEvents: activeReviewTimeline.events.length,
+              timeline: activeReviewTimeline,
+            })
+            lastBroadcastedReviewIdx = i
+          }
+        }
+      }
+    } else {
+      // Mode live normal
+      // Broadcast build recommendations (seulement si le profil change)
+      const currentStyleForBuild = getCoachingStyle()
+      const buildRec = generateBuildRecommendations(gameData, currentStyleForBuild)
+      const buildKey = `${buildRec.enemyProfile.dominantType}-${buildRec.gamePhase}-${buildRec.style}-${gameData.items.length}`
+      if (buildKey !== lastBroadcastedBuildKey) {
+        broadcastToWindows(IPC.OVERLAY_BUILD, buildRec)
+        lastBroadcastedBuildKey = buildKey
+      }
 
-    // Détecter et broadcaster les alertes courtes (3s)
-    const alerts = detectAlerts(gameData)
-    for (const alert of alerts) {
-      broadcastToWindows(IPC.OVERLAY_SHOW_ALERT, alert)
-      console.log(`[AlertEngine] ${alert.type}: ${alert.text}`)
-    }
+      // Détecter et broadcaster les alertes courtes (3s)
+      const alerts = detectAlerts(gameData)
+      for (const alert of alerts) {
+        broadcastToWindows(IPC.OVERLAY_SHOW_ALERT, alert)
+        console.log(`[AlertEngine] ${alert.type}: ${alert.text}`)
+      }
 
-    // Générer et broadcaster le macro tip (seulement si le texte change)
-    const currentStyle = getCoachingStyle()
-    const tip = generateMacroTip(gameData, currentStyle)
-    if (tip.text !== lastBroadcastedTip) {
-      lastBroadcastedTip = tip.text
-      broadcastToWindows(IPC.OVERLAY_SHOW_ADVICE, {
-        text: tip.text,
-        style: currentStyle,
-        priority: tip.priority,
-        timestamp: Date.now(),
-        gameTime: gameData.gameTime,
-      })
+      // Générer et broadcaster le macro tip (seulement si le texte change)
+      const currentStyle = getCoachingStyle()
+      const tip = generateMacroTip(gameData, currentStyle)
+      if (tip.text !== lastBroadcastedTip) {
+        lastBroadcastedTip = tip.text
+        broadcastToWindows(IPC.OVERLAY_SHOW_ADVICE, {
+          text: tip.text,
+          style: currentStyle,
+          priority: tip.priority,
+          timestamp: Date.now(),
+          gameTime: gameData.gameTime,
+        })
+      }
     }
 
   } catch (error) {

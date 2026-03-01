@@ -229,6 +229,45 @@ export interface RankedGame {
   roast: string             // phrase de tacle/compliment
 }
 
+// ─── Review Mode (replay coaching) ──────────────────────────────────────────
+
+export interface ReviewEvent {
+  gameTimeStart: number       // quand afficher (secondes dans le replay)
+  gameTimeDuration: number    // combien de temps afficher (secondes)
+  category: 'error' | 'strength' | 'tip'
+  title: string
+  description: string
+  priority: number            // 1-3 (3 = haute)
+}
+
+export interface ReviewStats {
+  kda: number
+  csPerMin: number
+  kp: number                  // kill participation %
+  wardScore: number
+  goldPerMin: number
+  deathsEarly: number         // morts 0-14 min
+  deathsMid: number           // morts 14-25 min
+  deathsLate: number          // morts 25+ min
+}
+
+export type ReviewGrade = 'S' | 'A' | 'B' | 'C' | 'D'
+
+export interface ReviewSummary {
+  grade: ReviewGrade
+  summary: string
+  errors: ReviewEvent[]
+  strengths: ReviewEvent[]
+  tips: ReviewEvent[]
+  stats: ReviewStats
+}
+
+export interface ReviewTimeline {
+  events: ReviewEvent[]       // triés par gameTimeStart
+  summary: ReviewSummary
+  gameId: number              // RankedGame.id associé
+}
+
 // Événement IPC générique
 export interface IpcPayload<T> {
   data: T

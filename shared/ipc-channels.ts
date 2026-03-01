@@ -41,7 +41,13 @@ export const IPC = {
   OVERLAY_MOUSE_IGNORE: 'overlay:mouse-ignore',
 
   // Renderer → Main : historique parties classées (invoke)
-  RANKED_HISTORY: 'ranked:history'
+  RANKED_HISTORY: 'ranked:history',
+
+  // Review mode (replay coaching)
+  REPLAY_DETECTED: 'replay:detected',
+  OVERLAY_REVIEW: 'overlay:review',
+  LAUNCH_REPLAY: 'launch:replay',
+  REVIEW_GENERATE: 'review:generate'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

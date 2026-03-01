@@ -38,7 +38,9 @@ const electronAPI = {
       IPC.SUBSCRIPTION_CHECK,
       IPC.ADVICE_HISTORY,
       IPC.QUOTA_STATUS,
-      IPC.RANKED_HISTORY
+      IPC.RANKED_HISTORY,
+      IPC.REVIEW_GENERATE,
+      IPC.LAUNCH_REPLAY,
     ]
     if (validChannels.includes(channel as (typeof validChannels)[number])) {
       return ipcRenderer.invoke(channel, data)
