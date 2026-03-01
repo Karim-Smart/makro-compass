@@ -24,6 +24,7 @@ const lcuHttpClient = axios.create({
 
 // ─── État interne ───────────────────────────────────────────────────────────
 
+let retryTimer: ReturnType<typeof setInterval> | null = null
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let lcuPort: number | null = null
 let lcuPassword: string | null = null
@@ -290,14 +291,14 @@ export async function startLcuAgent(): Promise<void> {
   const lockPath = findLockfile()
   if (!lockPath) {
     console.log('[LCUAgent] Lockfile introuvable — agent en veille (retry toutes les 30s)')
-    // Retry de trouver le lockfile toutes les 30s
-    pollTimer = setInterval(async () => {
+    // Retry de trouver le lockfile toutes les 30s (timer séparé de pollTimer)
+    retryTimer = setInterval(async () => {
       connectionAttempts++
       const path = findLockfile()
       if (path && parseLockfile(path)) {
         console.log(`[LCUAgent] League Client trouvé ! Port: ${lcuPort}`)
         await fetchChampionMap()
-        if (pollTimer) clearInterval(pollTimer)
+        if (retryTimer) { clearInterval(retryTimer); retryTimer = null }
         pollTimer = setInterval(poll, LCU_POLL_MS)
       } else if (connectionAttempts % 10 === 0) {
         console.debug(`[LCUAgent] Toujours pas de client (${connectionAttempts} tentatives)`)
@@ -319,11 +320,16 @@ export async function startLcuAgent(): Promise<void> {
 }
 
 export function stopLcuAgent(): void {
+  if (retryTimer) {
+    clearInterval(retryTimer)
+    retryTimer = null
+  }
   if (pollTimer) {
     clearInterval(pollTimer)
     pollTimer = null
   }
   lcuPort = null
   lcuPassword = null
+  lastAutoImportChampion = ''
   console.log('[LCUAgent] Arrêté.')
 }

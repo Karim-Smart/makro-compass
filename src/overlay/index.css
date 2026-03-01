@@ -16,3 +16,50 @@
     height: 100%;
   }
 }
+
+/* ─── Animations partagées overlay ─────────────────────────────── */
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shrink30s {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
+@keyframes shrink3s {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
+@keyframes alertSlide {
+  0%   { opacity: 0; transform: translateY(-8px); }
+  8%   { opacity: 1; transform: translateY(0); }
+  85%  { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-4px); }
+}
+
+@keyframes pulseOpacity {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.4s ease-out;
+}
+
+/* Transition smooth pour les valeurs numériques */
+.stat-value {
+  transition: color 0.3s ease;
+}

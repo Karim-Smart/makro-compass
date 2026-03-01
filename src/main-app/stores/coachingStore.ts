@@ -39,7 +39,11 @@ export const useCoachingStore = create<CoachingState>((set) => ({
   setGenerating: (value) => set({ isGenerating: value })
 }))
 
+let _ipcInitialized = false
+
 export function initCoachingStoreIpc(): void {
+  if (_ipcInitialized) return
+  _ipcInitialized = true
   const api = window.electronAPI
 
   api.on(IPC.OVERLAY_SHOW_ADVICE, (advice: unknown) => {

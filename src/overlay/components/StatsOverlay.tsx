@@ -21,21 +21,33 @@ export function StatsOverlay({ gameData, colors }: Props) {
   // Phase de jeu
   const phase = gameData.gameTime < 840 ? 'EARLY' : gameData.gameTime < 1500 ? 'MID' : 'LATE'
 
+  // Kill participation
+  const kp = gameData.teamKills > 0
+    ? Math.round(((gameData.kda.kills + gameData.kda.assists) / gameData.teamKills) * 100)
+    : 0
+
+  // Couleur KDA contextuelle
+  const kdaNum = gameData.kda.deaths === 0 ? 10 : (gameData.kda.kills + gameData.kda.assists) / gameData.kda.deaths
+  const kdaColor = kdaNum >= 4 ? '#22c55e' : kdaNum >= 2 ? colors.text : '#ef4444'
+
   const cols = [
     {
       label: timeStr,
       main:  `${gameData.kda.kills}/${gameData.kda.deaths}/${gameData.kda.assists}`,
       sub:   `${kdaRatio} KDA`,
+      mainColor: kdaColor,
     },
     {
       label: phase,
       main:  `${csPerMin}`,
-      sub:   `${gameData.cs} CS`,
+      sub:   `${gameData.cs} CS · ${kp}% KP`,
+      mainColor: colors.text,
     },
     {
       label: `Niv ${gameData.level}`,
       main:  `${(gameData.gold / 1000).toFixed(1)}k`,
       sub:   gameData.champion,
+      mainColor: colors.text,
     },
   ]
 
@@ -49,16 +61,16 @@ export function StatsOverlay({ gameData, colors }: Props) {
       }}
     >
       <div className="flex">
-        {cols.map(({ label, main, sub }, i) => (
+        {cols.map(({ label, main, sub, mainColor }, i) => (
           <div
-            key={label}
+            key={i}
             className="px-3 py-2 text-center flex-1"
             style={i > 0 ? { borderLeft: `1px solid ${colors.border}50` } : {}}
           >
             <div className="text-[8px] font-black uppercase tracking-[0.15em] mb-0.5" style={{ color: colors.accent, opacity: 0.5 }}>
               {label}
             </div>
-            <div className="text-xs font-mono font-black leading-tight" style={{ color: colors.text }}>
+            <div className="text-xs font-mono font-black leading-tight stat-value" style={{ color: mainColor }}>
               {main}
             </div>
             <div className="text-[9px] font-mono leading-none mt-0.5" style={{ color: colors.text, opacity: 0.5 }}>

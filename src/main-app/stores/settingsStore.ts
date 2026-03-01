@@ -44,7 +44,11 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   }
 }))
 
+let _ipcInitialized = false
+
 export function initSettingsStoreIpc(): void {
+  if (_ipcInitialized) return
+  _ipcInitialized = true
   window.electronAPI.on(IPC.SETTINGS_UPDATE, (settings: unknown) => {
     useSettingsStore.getState().applyPersistedSettings(settings as UserSettings)
   })

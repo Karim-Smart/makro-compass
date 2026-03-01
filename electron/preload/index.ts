@@ -3,13 +3,18 @@ import type { IpcRendererEvent } from 'electron'
 import { IPC } from '../../shared/ipc-channels'
 import type { CoachingStyle } from '../../shared/types'
 
+// Map pour associer les callbacks originaux aux wrappers IPC (nécessaire pour removeListener)
+const listenerMap = new Map<(...args: unknown[]) => void, (event: IpcRendererEvent, ...args: unknown[]) => void>()
+
 // API exposée au renderer de la fenêtre principale
 const electronAPI = {
   // Écouter les événements du main process
   on: (channel: string, callback: (...args: unknown[]) => void) => {
     const validChannels = Object.values(IPC)
     if (validChannels.includes(channel as (typeof validChannels)[number])) {
-      ipcRenderer.on(channel, (_event: IpcRendererEvent, ...args: unknown[]) => callback(...args))
+      const wrapper = (_event: IpcRendererEvent, ...args: unknown[]) => callback(...args)
+      listenerMap.set(callback, wrapper)
+      ipcRenderer.on(channel, wrapper)
     }
   },
 
@@ -20,6 +25,7 @@ const electronAPI = {
       IPC.OVERLAY_TOGGLE,
       IPC.SETTINGS_UPDATE,
       IPC.ROLE_CHANGE,
+      IPC.IMPORT_RUNES,
     ]
     if (validChannels.includes(channel as (typeof validChannels)[number])) {
       ipcRenderer.send(channel, data)
@@ -41,7 +47,11 @@ const electronAPI = {
 
   // Supprimer un listener
   removeListener: (channel: string, callback: (...args: unknown[]) => void) => {
-    ipcRenderer.removeListener(channel, callback as Parameters<typeof ipcRenderer.removeListener>[1])
+    const wrapper = listenerMap.get(callback)
+    if (wrapper) {
+      ipcRenderer.removeListener(channel, wrapper)
+      listenerMap.delete(callback)
+    }
   },
 
   // Actions spécifiques

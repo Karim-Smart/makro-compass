@@ -44,7 +44,7 @@ const riotHttpClient = axios.create({
   httpsAgent: new https.Agent({
     rejectUnauthorized: false,
     checkServerIdentity: () => undefined,
-    keepAlive: false,
+    keepAlive: true,
     maxSockets: 1,
     minVersion: 'TLSv1' as tls.SecureVersion,
     ciphers: 'ALL',
@@ -59,6 +59,10 @@ let wasInGame = false
 let lastProcessedEventId = -1
 let consecutiveErrors = 0
 const ERRORS_BEFORE_END = 3
+
+// Throttle : ne pas broadcasté la même donnée à chaque poll
+let lastBroadcastedTip = ''
+let lastBroadcastedBuildKey = ''
 
 // ─── Parsing enrichi ─────────────────────────────────────────────────────────
 
@@ -100,8 +104,6 @@ function parseGameData(raw: RiotApiResponse): GameData {
       enemyKills += p.scores?.kills ?? 0
     }
   }
-  // Ajouter nos kills au total équipe
-  teamKills += kills - (activePlayerData?.scores?.kills ?? 0) // déjà compté dans la boucle
 
   // Items du joueur actif
   const items: string[] = (activePlayerData?.items ?? [])
@@ -255,6 +257,8 @@ async function poll(): Promise<void> {
     if (!wasInGame) {
       wasInGame = true
       lastProcessedEventId = -1
+      lastBroadcastedTip = ''
+      lastBroadcastedBuildKey = ''
       resetMacroEngine()
       resetAlertEngine()
       const startTimestamp = Date.now() - gameData.gameTime * 1000
@@ -284,10 +288,14 @@ async function poll(): Promise<void> {
     // Stocker les dernières gameData pour le refresh build
     ;(global as typeof global & { __lastGameData?: GameData }).__lastGameData = gameData
 
-    // Broadcast build recommendations
+    // Broadcast build recommendations (seulement si le profil change)
     const currentStyleForBuild = getCoachingStyle()
     const buildRec = generateBuildRecommendations(gameData, currentStyleForBuild)
-    broadcastToWindows(IPC.OVERLAY_BUILD, buildRec)
+    const buildKey = `${buildRec.enemyProfile.dominantType}-${buildRec.gamePhase}-${buildRec.style}-${gameData.items.length}`
+    if (buildKey !== lastBroadcastedBuildKey) {
+      broadcastToWindows(IPC.OVERLAY_BUILD, buildRec)
+      lastBroadcastedBuildKey = buildKey
+    }
 
     // Détecter et broadcaster les alertes courtes (3s)
     const alerts = detectAlerts(gameData)
@@ -296,16 +304,19 @@ async function poll(): Promise<void> {
       console.log(`[AlertEngine] ${alert.type}: ${alert.text}`)
     }
 
-    // Générer et broadcaster le macro tip (code-only, pas d'IA)
+    // Générer et broadcaster le macro tip (seulement si le texte change)
     const currentStyle = getCoachingStyle()
     const tip = generateMacroTip(gameData, currentStyle)
-    broadcastToWindows(IPC.OVERLAY_SHOW_ADVICE, {
-      text: tip.text,
-      style: currentStyle,
-      priority: tip.priority,
-      timestamp: Date.now(),
-      gameTime: gameData.gameTime,
-    })
+    if (tip.text !== lastBroadcastedTip) {
+      lastBroadcastedTip = tip.text
+      broadcastToWindows(IPC.OVERLAY_SHOW_ADVICE, {
+        text: tip.text,
+        style: currentStyle,
+        priority: tip.priority,
+        timestamp: Date.now(),
+        gameTime: gameData.gameTime,
+      })
+    }
 
   } catch (error) {
     if (!axios.isAxiosError(error)) {
@@ -334,6 +345,8 @@ async function poll(): Promise<void> {
       wasInGame = false
       lastProcessedEventId = -1
       consecutiveErrors = 0
+      lastBroadcastedTip = ''
+      lastBroadcastedBuildKey = ''
       const status: GameStatus = { isInGame: false }
       broadcastToWindows(IPC.GAME_STATUS, status)
       hideOverlay()

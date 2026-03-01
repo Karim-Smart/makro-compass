@@ -39,7 +39,11 @@ export const useSubscriptionStore = create<SubscriptionState>((set) => ({
   }
 }))
 
+let _ipcInitialized = false
+
 export function initSubscriptionStoreIpc(): void {
+  if (_ipcInitialized) return
+  _ipcInitialized = true
   const api = window.electronAPI
 
   // Statut envoyé par le main au démarrage ou après génération d'un conseil

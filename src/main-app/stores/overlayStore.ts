@@ -31,7 +31,11 @@ export const useOverlayStore = create<OverlayState>((set, get) => ({
   }
 }))
 
+let _ipcInitialized = false
+
 export function initOverlayStoreIpc(): void {
+  if (_ipcInitialized) return
+  _ipcInitialized = true
   const api = window.electronAPI
 
   // Hotkey F9 appuyé dans le main process

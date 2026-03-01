@@ -38,8 +38,12 @@ export const useGameStore = create<GameState>((set) => ({
   setTimers: (timers) => set({ timers })
 }))
 
+let _ipcInitialized = false
+
 // Brancher le store sur les événements IPC (appelé une seule fois au démarrage)
 export function initGameStoreIpc(): void {
+  if (_ipcInitialized) return
+  _ipcInitialized = true
   const api = window.electronAPI
 
   api.on(IPC.GAME_STATUS, (status: unknown) => {

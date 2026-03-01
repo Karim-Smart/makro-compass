@@ -102,12 +102,6 @@ export function TimerOverlay({ timers, colors }: Props) {
         })}
       </div>
 
-      <style>{`
-        @keyframes pulseOpacity {
-          0%, 100% { opacity: 1; }
-          50%       { opacity: 0.5; }
-        }
-      `}</style>
     </div>
   )
 }

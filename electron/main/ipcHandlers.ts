@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow, globalShortcut } from 'electron'
+import { ipcMain, BrowserWindow, globalShortcut, safeStorage } from 'electron'
 import Store from 'electron-store'
 import { IPC } from '../../shared/ipc-channels'
 import type { CoachingStyle, UserSettings } from '../../shared/types'
@@ -27,11 +27,36 @@ const store = new Store<{ settings: UserSettings }>({
 })
 
 function loadSettings(): UserSettings {
-  return store.get('settings', DEFAULT_SETTINGS)
+  const settings = store.get('settings', DEFAULT_SETTINGS)
+  // Déchiffrer la clé API si elle existe
+  const encryptedKey = store.get('encryptedApiKey' as never) as string | undefined
+  if (encryptedKey && safeStorage.isEncryptionAvailable()) {
+    try {
+      settings.apiKey = safeStorage.decryptString(Buffer.from(encryptedKey, 'base64'))
+    } catch {
+      console.warn('[Settings] Impossible de déchiffrer la clé API')
+    }
+  }
+  return settings
 }
 
 function saveSettings(partial: Partial<UserSettings>): UserSettings {
   const current = loadSettings()
+
+  // Chiffrer la clé API séparément (pas en clair dans electron-store)
+  if (partial.apiKey !== undefined) {
+    if (partial.apiKey && safeStorage.isEncryptionAvailable()) {
+      const encrypted = safeStorage.encryptString(partial.apiKey)
+      store.set('encryptedApiKey' as never, encrypted.toString('base64') as never)
+    }
+    // Ne pas stocker la clé en clair dans settings
+    const { apiKey: _, ...rest } = partial
+    const updated = { ...current, ...rest, apiKey: partial.apiKey }
+    const { apiKey: _2, ...settingsWithoutKey } = updated
+    store.set('settings', { ...settingsWithoutKey, selectedStyle: updated.selectedStyle } as UserSettings)
+    return updated
+  }
+
   const updated = { ...current, ...partial }
   store.set('settings', updated)
   return updated
@@ -128,6 +153,13 @@ export function setupIpcHandlers(
     console.log('[IPC] F6 → import runes standard')
   })
 
+  // Click-through overlay : basculer entre mode interactif et passthrough
+  ipcMain.on(IPC.OVERLAY_MOUSE_IGNORE, (_event, ignore: boolean) => {
+    for (const win of getOverlayWindows()) {
+      win.setIgnoreMouseEvents(ignore, { forward: true })
+    }
+  })
+
   // Refresh build
   ipcMain.on(IPC.REFRESH_BUILD, () => {
     const g = global as typeof global & { __lastGameData?: import('../../shared/types').GameData }
@@ -155,7 +187,7 @@ function setupWindowRegistry(
 ): void {
   const registry: Record<string, BrowserWindow> = { main: mainWindow }
   overlayWindows.forEach((win, i) => {
-    registry[`overlay_${i}`] = win
+    if (win) registry[`overlay_${i}`] = win
   })
   ;(global as typeof global & { __windows: Record<string, BrowserWindow> }).__windows = registry
 }
@@ -210,9 +242,8 @@ export function broadcastToWindows(channel: string, data: unknown): void {
   if (!windows) return
 
   for (const win of Object.values(windows)) {
-    const browserWin = win as BrowserWindow
-    if (!browserWin.isDestroyed()) {
-      browserWin.webContents.send(channel, data)
+    if (win && !win.isDestroyed()) {
+      win.webContents.send(channel, data)
     }
   }
 }

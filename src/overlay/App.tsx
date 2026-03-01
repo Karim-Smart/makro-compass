@@ -58,36 +58,41 @@ export default function OverlayApp() {
   useEffect(() => {
     const api = window.overlayAPI
 
-    api.on(IPC.STYLE_CHANGE, (style: unknown) => {
+    const onStyleChange = (style: unknown) => {
       setSelectedStyle(style as CoachingStyle)
       setAdviceQueue([])
       setAdviceIdx(0)
-      setRunePages(null)  // Les nouvelles pages arrivent automatiquement
-    })
+      setRunePages(null)
+    }
 
-    api.on(IPC.OVERLAY_SHOW_ADVICE, (newAdvice: unknown) => {
+    const onAdvice = (newAdvice: unknown) => {
       const a = newAdvice as CoachAdvice
       setAdviceQueue((prev) => {
-        // Éviter les doublons consécutifs
         if (prev.length > 0 && prev[prev.length - 1].text === a.text) return prev
         const next = [...prev, a]
-        // Max 10 messages — supprimer le plus ancien
-        if (next.length > ADVICE_QUEUE_MAX) next.shift()
+        if (next.length > ADVICE_QUEUE_MAX) {
+          // Supprimer le plus ancien de priorité la plus basse
+          const lowestIdx = next.reduce((minI, item, i, arr) => {
+            const pri = { high: 3, medium: 2, low: 1 }
+            return (pri[item.priority] ?? 0) < (pri[arr[minI].priority] ?? 0) ? i : minI
+          }, 0)
+          next.splice(lowestIdx, 1)
+        }
         return next
       })
-    })
+    }
 
-    api.on(IPC.OVERLAY_SHOW_ALERT, (newAlert: unknown) => {
+    const onAlert = (newAlert: unknown) => {
       if (alertTimeoutRef.current) clearTimeout(alertTimeoutRef.current)
       setAlert(newAlert as GameAlert)
       alertTimeoutRef.current = setTimeout(() => setAlert(null), 3_000)
-    })
+    }
 
-    api.on(IPC.GAME_DATA, (data: unknown) => {
+    const onGameData = (data: unknown) => {
       setGameData(data as GameData)
-    })
+    }
 
-    api.on(IPC.GAME_STATUS, (status: unknown) => {
+    const onGameStatus = (status: unknown) => {
       const gameStatus = status as GameStatus
       if (!gameStatus.isInGame) {
         setGameData(null)
@@ -100,23 +105,41 @@ export default function OverlayApp() {
         if (rotateTimerRef.current) clearInterval(rotateTimerRef.current)
         if (alertTimeoutRef.current) clearTimeout(alertTimeoutRef.current)
       }
-    })
+    }
 
-    api.on(IPC.OVERLAY_TIMERS, (t: unknown) => {
+    const onTimers = (t: unknown) => {
       setTimers(t as ObjectiveTimers)
-    })
+    }
 
-    api.on(IPC.OVERLAY_RUNES, (pages: unknown) => {
+    const onRunes = (pages: unknown) => {
       setRunePages(pages as RunePageSet)
-    })
+    }
 
-    api.on(IPC.OVERLAY_BUILD, (data: unknown) => {
+    const onBuild = (data: unknown) => {
       setBuildData(data as BuildRecommendations)
-    })
+    }
+
+    api.on(IPC.STYLE_CHANGE, onStyleChange)
+    api.on(IPC.OVERLAY_SHOW_ADVICE, onAdvice)
+    api.on(IPC.OVERLAY_SHOW_ALERT, onAlert)
+    api.on(IPC.GAME_DATA, onGameData)
+    api.on(IPC.GAME_STATUS, onGameStatus)
+    api.on(IPC.OVERLAY_TIMERS, onTimers)
+    api.on(IPC.OVERLAY_RUNES, onRunes)
+    api.on(IPC.OVERLAY_BUILD, onBuild)
 
     return () => {
       if (rotateTimerRef.current) clearInterval(rotateTimerRef.current)
       if (alertTimeoutRef.current) clearTimeout(alertTimeoutRef.current)
+      // Nettoyer les listeners IPC pour éviter les fuites mémoire
+      api.removeListener(IPC.STYLE_CHANGE, onStyleChange)
+      api.removeListener(IPC.OVERLAY_SHOW_ADVICE, onAdvice)
+      api.removeListener(IPC.OVERLAY_SHOW_ALERT, onAlert)
+      api.removeListener(IPC.GAME_DATA, onGameData)
+      api.removeListener(IPC.GAME_STATUS, onGameStatus)
+      api.removeListener(IPC.OVERLAY_TIMERS, onTimers)
+      api.removeListener(IPC.OVERLAY_RUNES, onRunes)
+      api.removeListener(IPC.OVERLAY_BUILD, onBuild)
     }
   }, [])
 
@@ -193,10 +216,6 @@ export default function OverlayApp() {
             <LevelAlert gameData={gameData!} colors={colors} />
           )}
         </div>
-      )}
-
-      {panel === 'runes' && runePages && (
-        <RunesOverlay pages={runePages} colors={colors} />
       )}
 
       {panel === 'build' && buildData && (

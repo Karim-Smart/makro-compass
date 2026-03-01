@@ -50,18 +50,6 @@ export function AlertOverlay({ alert }: Props) {
         />
       </div>
 
-      <style>{`
-        @keyframes alertSlide {
-          0%   { opacity: 0; transform: translateY(-8px); }
-          8%   { opacity: 1; transform: translateY(0); }
-          85%  { opacity: 1; transform: translateY(0); }
-          100% { opacity: 0; transform: translateY(-4px); }
-        }
-        @keyframes shrink3s {
-          from { width: 100%; }
-          to   { width: 0%; }
-        }
-      `}</style>
     </div>
   )
 }

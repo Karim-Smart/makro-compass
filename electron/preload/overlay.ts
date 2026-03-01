@@ -3,27 +3,37 @@ import type { IpcRendererEvent } from 'electron'
 import { IPC } from '../../shared/ipc-channels'
 import type { CoachingStyle } from '../../shared/types'
 
+// Map pour associer les callbacks originaux aux wrappers IPC (nécessaire pour removeListener)
+const listenerMap = new Map<(...args: unknown[]) => void, (event: IpcRendererEvent, ...args: unknown[]) => void>()
+
+const VALID_ON_CHANNELS = [
+  IPC.OVERLAY_SHOW_ADVICE,
+  IPC.OVERLAY_SHOW_ALERT,
+  IPC.OVERLAY_TIMERS,
+  IPC.OVERLAY_TOGGLE,
+  IPC.GAME_DATA,
+  IPC.GAME_STATUS,
+  IPC.STYLE_CHANGE,
+  IPC.OVERLAY_BUILD,
+  IPC.OVERLAY_RUNES,
+]
+
 const overlayAPI = {
   // Écouter les événements envoyés depuis le main process
   on: (channel: string, callback: (...args: unknown[]) => void) => {
-    const validChannels = [
-      IPC.OVERLAY_SHOW_ADVICE,
-      IPC.OVERLAY_SHOW_ALERT,
-      IPC.OVERLAY_TIMERS,
-      IPC.OVERLAY_TOGGLE,
-      IPC.GAME_DATA,
-      IPC.GAME_STATUS,
-      IPC.STYLE_CHANGE,
-      IPC.OVERLAY_BUILD,
-      IPC.OVERLAY_RUNES,
-    ]
-    if (validChannels.includes(channel as (typeof validChannels)[number])) {
-      ipcRenderer.on(channel, (_event: IpcRendererEvent, ...args: unknown[]) => callback(...args))
+    if (VALID_ON_CHANNELS.includes(channel as (typeof VALID_ON_CHANNELS)[number])) {
+      const wrapper = (_event: IpcRendererEvent, ...args: unknown[]) => callback(...args)
+      listenerMap.set(callback, wrapper)
+      ipcRenderer.on(channel, wrapper)
     }
   },
 
   removeListener: (channel: string, callback: (...args: unknown[]) => void) => {
-    ipcRenderer.removeListener(channel, callback as Parameters<typeof ipcRenderer.removeListener>[1])
+    const wrapper = listenerMap.get(callback)
+    if (wrapper) {
+      ipcRenderer.removeListener(channel, wrapper)
+      listenerMap.delete(callback)
+    }
   },
 
   // Changer le style de coaching depuis l'overlay (boutons StyleSwitcher)

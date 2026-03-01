@@ -126,12 +126,6 @@ export function AdviceOverlay({ advice, colors, queuePos, queueTotal, rotateKey,
         </div>
       )}
 
-      <style>{`
-        @keyframes shrink30s {
-          from { width: 100%; }
-          to   { width: 0%; }
-        }
-      `}</style>
     </div>
   )
 }
