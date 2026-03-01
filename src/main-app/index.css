@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body {
+    @apply bg-gray-950 text-gray-100 font-sans;
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  #root {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Scrollbar fine et stylée */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 2px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.22);
+  }
+
+  /* Sélection de texte */
+  ::selection {
+    background: rgba(74, 159, 255, 0.3);
+    color: #fff;
+  }
+}
+
+/* Range slider custom */
+.range-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent, #4a9fff);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.4);
+}
+.range-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+  box-shadow: 0 0 10px var(--accent, #4a9fff), 0 0 0 3px rgba(0,0,0,0.4);
+}
+.range-slider:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px var(--accent, #4a9fff), 0 0 0 6px rgba(0,0,0,0.4);
+}
+
+/* Focus visible amélioré */
+*:focus-visible {
+  outline: 2px solid rgba(74, 159, 255, 0.6);
+  outline-offset: 2px;
+}
+
+/* Select custom */
+select option {
+  background: #0d1117;
+  color: #e5e7eb;
+}

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a0a2e"/>
+      <stop offset="100%" style="stop-color:#0d0616"/>
+    </linearGradient>
+  </defs>
+  <!-- Fond -->
+  <rect width="200" height="200" rx="16" fill="url(#g)"/>
+  <!-- Losange extérieur -->
+  <polygon points="100,15 185,100 100,185 15,100"
+           fill="none" stroke="#FF6600" stroke-width="5"/>
+  <!-- Losange intérieur -->
+  <polygon points="100,38 162,100 100,162 38,100"
+           fill="none" stroke="#FF6600" stroke-width="2" opacity="0.4"/>
+  <!-- Croix intérieure -->
+  <line x1="100" y1="38" x2="100" y2="162" stroke="#FF6600" stroke-width="2" opacity="0.3"/>
+  <line x1="38" y1="100" x2="162" y2="100" stroke="#FF6600" stroke-width="2" opacity="0.3"/>
+  <!-- Texte LEC -->
+  <text x="100" y="112" font-family="Arial Black, sans-serif" font-size="40" font-weight="900"
+        fill="#FF6600" text-anchor="middle" letter-spacing="2">LEC</text>
+</svg>

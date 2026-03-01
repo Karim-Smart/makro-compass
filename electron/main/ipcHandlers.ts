@@ -1,0 +1,218 @@
+import { ipcMain, BrowserWindow, globalShortcut } from 'electron'
+import Store from 'electron-store'
+import { IPC } from '../../shared/ipc-channels'
+import type { CoachingStyle, UserSettings } from '../../shared/types'
+import { startRiotAgent, stopRiotAgent } from '../agents/riotAgent'
+import { setCoachingStyle, setApiKey, getCoachingStyle, startAICoachAgent, stopAICoachAgent } from '../agents/aiCoachAgent'
+import { getSubscriptionStatus } from '../agents/subscriptionAgent'
+import { startTimerAgent, stopTimerAgent } from '../agents/timerAgent'
+import { startLcuAgent, stopLcuAgent, exportRunePageToClient } from '../agents/lcuAgent'
+import { getAdviceHistory, getQuotaStatus } from '../agents/quotaManager'
+import { generateBuildRecommendations } from '../agents/buildEngine'
+import { generateRunePages } from '../../shared/rune-data'
+import { getOverlayWindows } from './windowManager'
+
+// ─── Persistance des settings ─────────────────────────────────────────────────
+
+const DEFAULT_SETTINGS: UserSettings = {
+  hotkey: 'F9',
+  overlayOpacity: 0.9,
+  overlayPosition: { x: 100, y: 100 },
+  region: 'EUW',
+  selectedStyle: 'LCK'
+}
+
+const store = new Store<{ settings: UserSettings }>({
+  defaults: { settings: DEFAULT_SETTINGS }
+})
+
+function loadSettings(): UserSettings {
+  return store.get('settings', DEFAULT_SETTINGS)
+}
+
+function saveSettings(partial: Partial<UserSettings>): UserSettings {
+  const current = loadSettings()
+  const updated = { ...current, ...partial }
+  store.set('settings', updated)
+  return updated
+}
+
+/**
+ * Configure tous les handlers IPC du main process.
+ */
+export function setupIpcHandlers(
+  mainWindow: BrowserWindow,
+  overlayWindows: BrowserWindow[]
+): void {
+
+  // Changement du style de coaching
+  ipcMain.on(IPC.STYLE_CHANGE, (_event, style: CoachingStyle) => {
+    setCoachingStyle(style)
+    saveSettings({ selectedStyle: style })
+    for (const win of getOverlayWindows()) {
+      win.webContents.send(IPC.STYLE_CHANGE, style)
+    }
+    // Recalculer les runes avec le nouveau style
+    const g = global as typeof global & { __lastGameData?: import('../../shared/types').GameData }
+    if (g.__lastGameData) {
+      const runePages = generateRunePages(g.__lastGameData.champion, style)
+      broadcastToWindows(IPC.OVERLAY_RUNES, runePages)
+    }
+  })
+
+  ipcMain.handle(IPC.SUBSCRIPTION_CHECK, async () => {
+    return await getSubscriptionStatus()
+  })
+
+  ipcMain.on(IPC.SETTINGS_UPDATE, (_event, partial: Partial<UserSettings>) => {
+    const updated = saveSettings(partial)
+    console.log('[IPC] Settings persistés:', Object.keys(partial).join(', '))
+
+    if (partial.apiKey) {
+      setApiKey(partial.apiKey)
+    }
+
+    if (partial.overlayOpacity !== undefined) {
+      for (const win of getOverlayWindows()) {
+        win.setOpacity(updated.overlayOpacity)
+      }
+    }
+  })
+
+  ipcMain.handle(IPC.ADVICE_HISTORY, () => {
+    return getAdviceHistory()
+  })
+
+  ipcMain.handle(IPC.QUOTA_STATUS, () => {
+    return getQuotaStatus()
+  })
+
+  // Changement de rôle (depuis la page Draft)
+  ipcMain.on(IPC.ROLE_CHANGE, (_event, role: string) => {
+    console.log(`[IPC] Rôle changé → ${role}`)
+    saveSettings({ ...loadSettings() })  // juste pour log, pas de persistance spéciale ici
+  })
+
+  // Toggle overlay depuis le bouton UI
+  ipcMain.on(IPC.OVERLAY_TOGGLE, (_event, shouldShow?: boolean) => {
+    const windows = getOverlayWindows()
+    if (windows.length === 0) return
+    const nextVisible = shouldShow !== undefined ? shouldShow : !windows[0].isVisible()
+    for (const win of windows) {
+      if (nextVisible) win.show()
+      else win.hide()
+    }
+    mainWindow.webContents.send(IPC.OVERLAY_TOGGLE, nextVisible)
+  })
+
+  // ─── Import runes via bouton overlay ou F6 ──────────────────────────────
+
+  let lastRunePages: import('../../shared/types').RunePageSet | null = null
+
+  ipcMain.on(IPC.IMPORT_RUNES, (_event, variant: string) => {
+    if (!lastRunePages) return
+    const page = lastRunePages[variant as keyof typeof lastRunePages]
+    if (!page) return
+    exportRunePageToClient(page)
+  })
+
+  // Stocker les runes quand elles sont broadcastées
+  ipcMain.on(IPC.OVERLAY_RUNES, (_event, pages: unknown) => {
+    lastRunePages = pages as import('../../shared/types').RunePageSet
+  })
+
+  // Raccourci global F6 → importer la page standard
+  globalShortcut.register('F6', () => {
+    if (!lastRunePages) return
+    exportRunePageToClient(lastRunePages.standard)
+    console.log('[IPC] F6 → import runes standard')
+  })
+
+  // Refresh build
+  ipcMain.on(IPC.REFRESH_BUILD, () => {
+    const g = global as typeof global & { __lastGameData?: import('../../shared/types').GameData }
+    if (!g.__lastGameData) return
+    const style = getCoachingStyle()
+    const buildRec = generateBuildRecommendations(g.__lastGameData, style)
+    broadcastToWindows(IPC.OVERLAY_BUILD, buildRec)
+  })
+
+  // ─── Registry des fenêtres pour broadcastToWindows ────────────────────────
+
+  setupWindowRegistry(mainWindow, overlayWindows)
+
+  // ─── Démarrage des agents + chargement des settings persistés ────────────
+
+  startAgents(mainWindow)
+}
+
+/**
+ * Expose les fenêtres aux agents via une registry globale.
+ */
+function setupWindowRegistry(
+  mainWindow: BrowserWindow,
+  overlayWindows: BrowserWindow[]
+): void {
+  const registry: Record<string, BrowserWindow> = { main: mainWindow }
+  overlayWindows.forEach((win, i) => {
+    registry[`overlay_${i}`] = win
+  })
+  ;(global as typeof global & { __windows: Record<string, BrowserWindow> }).__windows = registry
+}
+
+/**
+ * Démarre tous les agents et applique les settings persistés.
+ */
+async function startAgents(mainWindow: BrowserWindow): Promise<void> {
+  try {
+    const settings = loadSettings()
+
+    if (settings.apiKey) {
+      setApiKey(settings.apiKey)
+    }
+
+    setCoachingStyle(settings.selectedStyle)
+
+    // Envoyer les settings au renderer principal
+    mainWindow.webContents.once('did-finish-load', () => {
+      mainWindow.webContents.send(IPC.SETTINGS_UPDATE, settings)
+    })
+
+    await startRiotAgent()
+    await startAICoachAgent()
+    await startTimerAgent()
+    await startLcuAgent()
+
+    const status = await getSubscriptionStatus()
+    mainWindow.webContents.send(IPC.SUBSCRIPTION_STATUS, status)
+  } catch (err) {
+    console.error('[Main] Erreur démarrage agents:', err)
+  }
+}
+
+/**
+ * Arrête proprement tous les agents.
+ */
+export function stopAllAgents(): void {
+  stopRiotAgent()
+  stopAICoachAgent()
+  stopTimerAgent()
+  stopLcuAgent()
+  globalShortcut.unregisterAll()
+}
+
+/**
+ * Envoie des données à toutes les fenêtres enregistrées.
+ */
+export function broadcastToWindows(channel: string, data: unknown): void {
+  const g = global as typeof global & { __windows?: Record<string, BrowserWindow> }
+  const windows = g.__windows
+  if (!windows) return
+
+  for (const win of Object.values(windows)) {
+    const browserWin = win as BrowserWindow
+    if (!browserWin.isDestroyed()) {
+      browserWin.webContents.send(channel, data)
+    }
+  }
+}

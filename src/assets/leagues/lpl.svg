@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a0a00"/>
+      <stop offset="100%" style="stop-color:#0d0500"/>
+    </linearGradient>
+  </defs>
+  <!-- Fond -->
+  <rect width="200" height="200" rx="16" fill="url(#g)"/>
+  <!-- Dragon stylisé (corps en S) -->
+  <path d="M60 40 Q120 30 130 70 Q140 100 100 110 Q60 120 70 155 Q80 180 130 170"
+        fill="none" stroke="#FF8C00" stroke-width="6" stroke-linecap="round"/>
+  <!-- Tête du dragon -->
+  <circle cx="60" cy="40" r="10" fill="#FF8C00"/>
+  <circle cx="53" cy="35" r="4" fill="#FFD700"/>
+  <!-- Flamme -->
+  <path d="M50 42 Q40 35 45 25 Q55 35 50 42Z" fill="#FFD700" opacity="0.9"/>
+  <!-- Écailles -->
+  <path d="M105 85 Q115 80 120 90 Q110 95 105 85Z" fill="#FF8C00" opacity="0.7"/>
+  <path d="M90 100 Q100 95 105 105 Q95 110 90 100Z" fill="#FF8C00" opacity="0.7"/>
+  <!-- Queue -->
+  <circle cx="130" cy="170" r="7" fill="#FF8C00"/>
+  <!-- Texte LPL -->
+  <text x="100" y="118" font-family="Arial Black, sans-serif" font-size="38" font-weight="900"
+        fill="#FF8C00" text-anchor="middle" letter-spacing="2">LPL</text>
+</svg>

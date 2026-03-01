@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+    "target": "ESNext",
+    "outDir": "out",
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["shared/*"],
+      "@agents/*": ["electron/agents/*"]
+    }
+  },
+  "include": [
+    "electron/**/*",
+    "shared/**/*",
+    "electron.vite.config.ts"
+  ]
+}
