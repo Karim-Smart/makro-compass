@@ -1,36 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useCoachingStore } from '../stores/coachingStore'
-import { useSubscriptionStore } from '../stores/subscriptionStore'
 import { COACHING_STYLES } from '../../../shared/constants'
-import { IPC } from '../../../shared/ipc-channels'
-
-interface QuotaInfo { used: number; resetAt: number }
+import type { OverlayPanels } from '../../../shared/types'
 
 // ─── Icônes ───────────────────────────────────────────────────────────────────
-
-function EyeOpen() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
-      className="w-4 h-4">
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  )
-}
-
-function EyeOff() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
-      className="w-4 h-4">
-      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-      <line x1="1" y1="1" x2="23" y2="23" />
-    </svg>
-  )
-}
 
 function IconSave() {
   return (
@@ -52,26 +26,30 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
+const PANEL_META: { key: keyof OverlayPanels; label: string; desc: string }[] = [
+  { key: 'stats',   label: 'Stats en jeu',        desc: 'KDA, CS, or, timer — haut-gauche' },
+  { key: 'timers',  label: 'Timers & objectifs',   desc: 'Dragons, baron, herald — bas-gauche' },
+  { key: 'advice',  label: 'Conseils macro',        desc: 'Tips en temps réel — haut-droite' },
+  { key: 'style',   label: 'Switch de style',       desc: 'LCK / LEC / LCS / LPL — droite' },
+  { key: 'build',   label: 'Build recommandé',      desc: 'Items situationnels — droite' },
+]
+
 export default function Settings() {
   const { settings, updateSettings } = useSettingsStore()
   const { selectedStyle } = useCoachingStore()
-  const { status: subStatus } = useSubscriptionStore()
   const style = COACHING_STYLES[selectedStyle]
   const c = style.colors
 
-  const [apiKey, setApiKey] = useState(settings.apiKey ?? '')
-  const [showKey, setShowKey] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [quota, setQuota] = useState<QuotaInfo | null>(null)
 
-  useEffect(() => {
-    window.electronAPI.invoke(IPC.QUOTA_STATUS)
-      .then((data) => setQuota(data as QuotaInfo))
-      .catch(() => null)
-  }, [])
+  const panels = settings.overlayPanels ?? { stats: true, timers: true, advice: true, style: true, build: true }
+
+  const togglePanel = (key: keyof OverlayPanels) => {
+    const updated = { ...panels, [key]: !panels[key] }
+    updateSettings({ overlayPanels: updated })
+  }
 
   const handleSave = () => {
-    updateSettings({ apiKey, overlayOpacity: settings.overlayOpacity })
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -92,38 +70,38 @@ export default function Settings() {
   return (
     <div className="p-5 max-w-lg overflow-auto h-full flex flex-col gap-0">
 
-      {/* ── IA ── */}
-      <SectionLabel>Intelligence artificielle</SectionLabel>
+      {/* ── Panneaux overlay ── */}
+      <SectionLabel>Panneaux overlay</SectionLabel>
 
-      <div className="rounded-xl p-4 mb-3" style={card}>
-        <label className={labelCls} style={{ color: c.text, opacity: 0.65 }}>
-          Clé API Anthropic
-        </label>
-        <div className="relative">
-          <input
-            type={showKey ? 'text' : 'password'}
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder="sk-ant-api03-..."
-            className="w-full pr-10 px-3 py-2.5 rounded-lg text-sm font-mono focus:outline-none transition-colors"
-            style={inputBase}
-            onFocus={(e) => (e.target.style.borderColor = c.accent)}
-            onBlur={(e) => (e.target.style.borderColor = c.border)}
-          />
-          <button
-            type="button"
-            onClick={() => setShowKey((v) => !v)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 opacity-35 hover:opacity-70 transition-opacity"
-            style={{ color: c.text }}
-            tabIndex={-1}
-          >
-            {showKey ? <EyeOff /> : <EyeOpen />}
-          </button>
-        </div>
-        <p className="text-[10px] mt-1.5 px-0.5" style={{ color: c.text, opacity: 0.3 }}>
-          Utilisée pour générer des conseils via Claude Haiku.
-          Obtenir une clé sur <span className="underline opacity-60">console.anthropic.com</span>
-        </p>
+      <div className="rounded-xl p-4 mb-3 flex flex-col gap-3" style={card}>
+        {PANEL_META.map(({ key, label, desc }) => {
+          const active = panels[key]
+          return (
+            <div key={key} className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold" style={{ color: c.text, opacity: active ? 0.85 : 0.35 }}>
+                  {label}
+                </div>
+                <div className="text-[10px]" style={{ color: c.text, opacity: 0.3 }}>
+                  {desc}
+                </div>
+              </div>
+              <button
+                onClick={() => togglePanel(key)}
+                className="relative flex-shrink-0 w-10 h-5 rounded-full transition-all duration-200"
+                style={{
+                  backgroundColor: active ? c.accent : `${c.border}80`,
+                  boxShadow: active ? `0 0 10px ${c.accent}50` : 'none',
+                }}
+              >
+                <span
+                  className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all duration-200"
+                  style={{ left: active ? 'calc(100% - 1.125rem)' : '2px' }}
+                />
+              </button>
+            </div>
+          )
+        })}
       </div>
 
       {/* ── Overlay ── */}
@@ -187,63 +165,10 @@ export default function Settings() {
         </select>
       </div>
 
-      <div className="rounded-xl p-4 mb-5" style={card}>
-        <div className="flex items-center justify-between mb-3">
-          <label className={labelCls} style={{ color: c.text, opacity: 0.65, marginBottom: 0 }}>
-            Quota de conseils IA
-          </label>
-          {subStatus && (
-            <span
-              className="text-[9px] font-black px-2 py-0.5 rounded tracking-widest uppercase"
-              style={{ backgroundColor: c.accent, color: c.bg }}
-            >
-              {subStatus.tier}
-            </span>
-          )}
-        </div>
-
-        {quota && subStatus ? (
-          <div className="space-y-2">
-            <div className="flex items-baseline gap-1.5">
-              <span className="font-mono font-black text-2xl" style={{ color: c.accent }}>
-                {quota.used}
-              </span>
-              <span className="font-mono text-sm" style={{ color: c.text, opacity: 0.35 }}>
-                / {subStatus.quotaMax ?? '∞'}
-              </span>
-              <span className="text-[10px] ml-0.5" style={{ color: c.text, opacity: 0.28 }}>
-                aujourd'hui
-              </span>
-            </div>
-
-            {subStatus.quotaMax && (
-              <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: `${c.border}80` }}>
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${Math.min(100, (quota.used / subStatus.quotaMax) * 100)}%`,
-                    backgroundColor: c.accent,
-                    transition: 'width 0.5s ease',
-                  }}
-                />
-              </div>
-            )}
-
-            <p className="text-[10px]" style={{ color: c.text, opacity: 0.28 }}>
-              Réinitialisation le {new Date(quota.resetAt).toLocaleDateString('fr-FR', {
-                day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
-              })}
-            </p>
-          </div>
-        ) : (
-          <div className="h-8 rounded-lg animate-pulse" style={{ backgroundColor: c.border }} />
-        )}
-      </div>
-
       {/* ── Sauvegarder ── */}
       <button
         onClick={handleSave}
-        className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-bold text-sm transition-all duration-200 active:scale-[0.98] flex-shrink-0"
+        className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-bold text-sm transition-all duration-200 active:scale-[0.98] flex-shrink-0 mt-2"
         style={{
           backgroundColor: saved ? '#22c55e' : c.accent,
           color: saved ? '#fff' : c.bg,

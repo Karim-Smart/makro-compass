@@ -1,6 +1,7 @@
 import { BrowserWindow, screen, shell } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
+import type { OverlayPanels } from '../../shared/types'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -10,6 +11,18 @@ let timersWindow: BrowserWindow | null = null
 let adviceWindow: BrowserWindow | null = null
 let styleWindow: BrowserWindow | null = null
 let buildWindow: BrowserWindow | null = null
+
+// Préférences de visibilité par panneau (par défaut tout activé)
+let panelSettings: OverlayPanels = {
+  stats: true,
+  timers: true,
+  advice: true,
+  style: true,
+  build: true,
+}
+
+// true quand l'overlay est globalement affiché (partie en cours)
+let overlayActive = false
 
 const PRELOAD_MAIN = join(__dirname, '../preload/index.cjs')
 const PRELOAD_OVERLAY = join(__dirname, '../preload/overlay.cjs')
@@ -182,14 +195,48 @@ export function getOverlayWindows(): BrowserWindow[] {
   )
 }
 
+/** Retourne la fenêtre overlay d'un panneau spécifique. */
+function getPanelWindow(panel: keyof OverlayPanels): BrowserWindow | null {
+  const map: Record<keyof OverlayPanels, BrowserWindow | null> = {
+    stats: statsWindow,
+    timers: timersWindow,
+    advice: adviceWindow,
+    style: styleWindow,
+    build: buildWindow,
+  }
+  return map[panel]
+}
+
+/**
+ * Met à jour les préférences de panneau et applique immédiatement
+ * si l'overlay est actif (partie en cours).
+ */
+export function setPanelSettings(panels: Partial<OverlayPanels>): void {
+  panelSettings = { ...panelSettings, ...panels }
+  if (overlayActive) {
+    // Appliquer en temps réel : show/hide chaque panneau
+    for (const key of Object.keys(panelSettings) as (keyof OverlayPanels)[]) {
+      const win = getPanelWindow(key)
+      if (!win || win.isDestroyed()) continue
+      if (panelSettings[key]) win.show()
+      else win.hide()
+    }
+  }
+}
+
 export function showOverlay(): void {
-  for (const win of getOverlayWindows()) {
-    win.show()
+  overlayActive = true
+  for (const key of Object.keys(panelSettings) as (keyof OverlayPanels)[]) {
+    const win = getPanelWindow(key)
+    if (!win || win.isDestroyed()) continue
+    if (panelSettings[key]) win.show()
+    // les panneaux désactivés restent cachés
   }
   console.log('[WindowManager] Overlays affichés (partie détectée)')
 }
 
 export function hideOverlay(): void {
+  overlayActive = false
   for (const win of getOverlayWindows()) {
     win.hide()
   }

@@ -12,16 +12,19 @@ import { generateBuildRecommendations } from '../agents/buildEngine'
 import { generateReviewTimeline } from '../agents/reviewEngine'
 import type { RankedGame } from '../../shared/types'
 import { generateRunePages } from '../../shared/rune-data'
-import { getOverlayWindows } from './windowManager'
+import { getOverlayWindows, setPanelSettings } from './windowManager'
 
 // ─── Persistance des settings ─────────────────────────────────────────────────
+
+const DEFAULT_OVERLAY_PANELS = { stats: true, timers: true, advice: true, style: true, build: true }
 
 const DEFAULT_SETTINGS: UserSettings = {
   hotkey: 'F9',
   overlayOpacity: 0.9,
   overlayPosition: { x: 100, y: 100 },
   region: 'EUW',
-  selectedStyle: 'LCK'
+  selectedStyle: 'LCK',
+  overlayPanels: DEFAULT_OVERLAY_PANELS,
 }
 
 const store = new Store<{ settings: UserSettings }>({
@@ -66,11 +69,15 @@ function saveSettings(partial: Partial<UserSettings>): UserSettings {
 
 /**
  * Configure tous les handlers IPC du main process.
+ * Retourne les settings chargés pour initialisation externe (ex. panneaux overlay).
  */
 export function setupIpcHandlers(
   mainWindow: BrowserWindow,
   overlayWindows: BrowserWindow[]
-): void {
+): UserSettings {
+  const initialSettings = loadSettings()
+  // Appliquer les préférences de panneaux au démarrage
+  setPanelSettings(initialSettings.overlayPanels ?? DEFAULT_OVERLAY_PANELS)
 
   // Changement du style de coaching
   ipcMain.on(IPC.STYLE_CHANGE, (_event, style: CoachingStyle) => {
@@ -103,6 +110,10 @@ export function setupIpcHandlers(
       for (const win of getOverlayWindows()) {
         win.setOpacity(updated.overlayOpacity)
       }
+    }
+
+    if (partial.overlayPanels !== undefined) {
+      setPanelSettings(partial.overlayPanels)
     }
   })
 
@@ -200,6 +211,8 @@ export function setupIpcHandlers(
   // ─── Démarrage des agents + chargement des settings persistés ────────────
 
   startAgents(mainWindow)
+
+  return initialSettings
 }
 
 /**

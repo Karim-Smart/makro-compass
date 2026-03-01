@@ -144,6 +144,15 @@ export interface SubscriptionStatus {
   nextResetAt: number       // timestamp Unix (reset quotidien)
 }
 
+// Visibilité individuelle des panneaux overlay
+export interface OverlayPanels {
+  stats: boolean    // KDA, CS, gold, timer (haut-gauche)
+  timers: boolean   // Timers objectifs (bas-gauche)
+  advice: boolean   // Conseils macro (haut-droite)
+  style: boolean    // Switch de style LCK/LEC/… (droite)
+  build: boolean    // Build recommandé (droite)
+}
+
 // Paramètres utilisateur
 export interface UserSettings {
   hotkey: string            // Par défaut 'F9'
@@ -152,6 +161,7 @@ export interface UserSettings {
   region: string            // 'EUW', 'NA', 'KR', etc.
   selectedStyle: CoachingStyle
   apiKey?: string
+  overlayPanels: OverlayPanels
 }
 
 // ─── Runes complètes ─────────────────────────────────────────────────────────

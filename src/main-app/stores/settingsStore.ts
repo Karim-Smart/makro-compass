@@ -15,7 +15,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   overlayOpacity: 0.9,
   overlayPosition: { x: 100, y: 100 },
   region: 'EUW',
-  selectedStyle: 'LCK'
+  selectedStyle: 'LCK',
+  overlayPanels: { stats: true, timers: true, advice: true, style: true, build: true },
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
