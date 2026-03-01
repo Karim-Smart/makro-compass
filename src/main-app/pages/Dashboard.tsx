@@ -8,7 +8,7 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { COACHING_STYLES, TIER_LABELS } from '../../../shared/constants'
 import { IPC } from '../../../shared/ipc-channels'
 import { getChampionIconUrl } from '../../../shared/champion-images'
-import { computeStreak } from '../../../shared/game-analysis'
+import { computeStreak, computeRecentForm } from '../../../shared/game-analysis'
 import type { RankedGame } from '../../../shared/types'
 
 function formatGameTime(s: number): string {
@@ -237,7 +237,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ─── Série récente (mini dots) — hors partie seulement ─── */}
+      {/* ─── SESSION DU JOUR — hors partie ─── */}
       {!isInGame && todayGames.length === 0 && (
         <div
           className="clip-bevel px-4 py-3 flex items-center gap-3 flex-shrink-0"
@@ -248,6 +248,80 @@ export default function Dashboard() {
           </span>
         </div>
       )}
+
+      {/* Session détaillée du jour */}
+      {!isInGame && todayGames.length > 0 && (() => {
+        const form = computeRecentForm(todayGames, todayGames.length)
+        const avgKda = todayGames.reduce((a, g) => a + (g.deaths === 0 ? (g.kills + g.assists) : (g.kills + g.assists) / g.deaths), 0) / todayGames.length
+        const avgCsMin = todayGames.reduce((a, g) => a + (g.gameTime > 0 ? g.cs / (g.gameTime / 60) : 0), 0) / todayGames.length
+
+        // Champion le plus joué
+        const champCounts: Record<string, { count: number; wins: number }> = {}
+        for (const g of todayGames) {
+          if (!champCounts[g.champion]) champCounts[g.champion] = { count: 0, wins: 0 }
+          champCounts[g.champion].count++
+          if (g.result === 'win') champCounts[g.champion].wins++
+        }
+        const topChamp = Object.entries(champCounts).sort(([, a], [, b]) => b.count - a.count)[0]
+
+        return (
+          <div
+            className="clip-bevel-lg px-4 py-3 flex-shrink-0"
+            style={{ background: `linear-gradient(160deg, ${c.bg} 0%, ${c.border}30 100%)`, border: `1px solid ${c.border}` }}
+          >
+            {/* Sparkline + stats */}
+            <div className="flex items-center gap-4">
+              {/* Sparkline wins/losses */}
+              <div className="flex items-center gap-0.5 flex-shrink-0">
+                {form.map((w, i) => (
+                  <div
+                    key={i}
+                    className="w-2.5 h-4 rounded-sm"
+                    style={{
+                      backgroundColor: w === 1 ? '#22c55e' : '#ef4444',
+                      opacity: 0.7,
+                    }}
+                  />
+                ))}
+              </div>
+
+              {/* Stats moyennes */}
+              <div className="flex items-center gap-3 ml-auto">
+                <div className="text-center">
+                  <div className="text-[7px] font-black uppercase tracking-widest" style={{ color: c.text, opacity: 0.3 }}>KDA moy</div>
+                  <div className="text-xs font-mono font-bold" style={{ color: avgKda >= 3 ? '#22c55e' : avgKda >= 1.5 ? c.accent : '#ef4444' }}>
+                    {avgKda.toFixed(1)}
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-[7px] font-black uppercase tracking-widest" style={{ color: c.text, opacity: 0.3 }}>CS/min</div>
+                  <div className="text-xs font-mono font-bold" style={{ color: c.accent }}>
+                    {avgCsMin.toFixed(1)}
+                  </div>
+                </div>
+                {topChamp && (
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-6 h-6 clip-hex overflow-hidden flex-shrink-0">
+                      <img
+                        src={getChampionIconUrl(topChamp[0])}
+                        alt={topChamp[0]}
+                        className="w-full h-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                      />
+                    </div>
+                    <div>
+                      <div className="text-[8px] font-bold" style={{ color: c.text }}>{topChamp[0]}</div>
+                      <div className="text-[7px] font-mono" style={{ color: c.text, opacity: 0.5 }}>
+                        {topChamp[1].count}G · {Math.round((topChamp[1].wins / topChamp[1].count) * 100)}%
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ─── DERNIER CONSEIL ─── */}
       <div
