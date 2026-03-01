@@ -17,6 +17,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   region: 'EUW',
   selectedStyle: 'LCK',
   overlayPanels: { stats: true, timers: true, advice: true, style: true, build: true },
+  voiceAlerts: true,
+  voiceVolume: 0.8,
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({

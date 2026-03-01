@@ -162,6 +162,8 @@ export interface UserSettings {
   selectedStyle: CoachingStyle
   apiKey?: string
   overlayPanels: OverlayPanels
+  voiceAlerts: boolean      // TTS des alertes (voix mexicaine)
+  voiceVolume: number       // 0 à 1 (volume de la voix)
 }
 
 // ─── Runes complètes ─────────────────────────────────────────────────────────

@@ -25,6 +25,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   region: 'EUW',
   selectedStyle: 'LCK',
   overlayPanels: DEFAULT_OVERLAY_PANELS,
+  voiceAlerts: true,
+  voiceVolume: 0.8,
 }
 
 const store = new Store<{ settings: UserSettings }>({
@@ -114,6 +116,18 @@ export function setupIpcHandlers(
 
     if (partial.overlayPanels !== undefined) {
       setPanelSettings(partial.overlayPanels)
+    }
+
+    // Syncer les settings voix vers les overlays en temps réel
+    if (partial.voiceAlerts !== undefined || partial.voiceVolume !== undefined) {
+      for (const win of getOverlayWindows()) {
+        if (!win.isDestroyed()) {
+          win.webContents.send(IPC.SETTINGS_UPDATE, {
+            voiceAlerts: updated.voiceAlerts,
+            voiceVolume: updated.voiceVolume,
+          })
+        }
+      }
     }
   })
 
@@ -210,7 +224,7 @@ export function setupIpcHandlers(
 
   // ─── Démarrage des agents + chargement des settings persistés ────────────
 
-  startAgents(mainWindow)
+  startAgents(mainWindow, overlayWindows)
 
   return initialSettings
 }
@@ -232,7 +246,7 @@ function setupWindowRegistry(
 /**
  * Démarre tous les agents et applique les settings persistés.
  */
-async function startAgents(mainWindow: BrowserWindow): Promise<void> {
+async function startAgents(mainWindow: BrowserWindow, overlayWindows: BrowserWindow[]): Promise<void> {
   try {
     const settings = loadSettings()
 
@@ -246,6 +260,16 @@ async function startAgents(mainWindow: BrowserWindow): Promise<void> {
     mainWindow.webContents.once('did-finish-load', () => {
       mainWindow.webContents.send(IPC.SETTINGS_UPDATE, settings)
     })
+
+    // Envoyer les settings voix aux overlays au démarrage
+    for (const win of overlayWindows) {
+      win.webContents.once('did-finish-load', () => {
+        win.webContents.send(IPC.SETTINGS_UPDATE, {
+          voiceAlerts: settings.voiceAlerts ?? true,
+          voiceVolume: settings.voiceVolume ?? 0.8,
+        })
+      })
+    }
 
     await startRiotAgent()
     await startAICoachAgent()

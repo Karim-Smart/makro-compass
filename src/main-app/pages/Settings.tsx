@@ -104,6 +104,58 @@ export default function Settings() {
         })}
       </div>
 
+      {/* ── Voix ── */}
+      <SectionLabel>Alertes vocales</SectionLabel>
+
+      <div className="rounded-xl p-4 mb-3 flex flex-col gap-4" style={card}>
+        {/* Toggle voix */}
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-xs font-semibold" style={{ color: c.text, opacity: settings.voiceAlerts ? 0.85 : 0.35 }}>
+              Voix activée
+            </div>
+            <div className="text-[10px]" style={{ color: c.text, opacity: 0.3 }}>
+              Lit les alertes à voix haute (accent mexicain)
+            </div>
+          </div>
+          <button
+            onClick={() => updateSettings({ voiceAlerts: !settings.voiceAlerts })}
+            className="relative flex-shrink-0 w-10 h-5 rounded-full transition-all duration-200"
+            style={{
+              backgroundColor: settings.voiceAlerts ? c.accent : `${c.border}80`,
+              boxShadow: settings.voiceAlerts ? `0 0 10px ${c.accent}50` : 'none',
+            }}
+          >
+            <span
+              className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all duration-200"
+              style={{ left: settings.voiceAlerts ? 'calc(100% - 1.125rem)' : '2px' }}
+            />
+          </button>
+        </div>
+
+        {/* Slider volume */}
+        <div style={{ opacity: settings.voiceAlerts ? 1 : 0.35, transition: 'opacity 0.2s' }}>
+          <div className="flex items-center justify-between mb-2">
+            <label className={labelCls} style={{ color: c.text, opacity: 0.65, marginBottom: 0 }}>
+              Volume
+            </label>
+            <span className="font-mono font-black text-sm" style={{ color: c.accent }}>
+              {Math.round((settings.voiceVolume ?? 0.8) * 100)}%
+            </span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={Math.round((settings.voiceVolume ?? 0.8) * 100)}
+            onChange={(e) => updateSettings({ voiceVolume: Number(e.target.value) / 100 })}
+            disabled={!settings.voiceAlerts}
+            className="range-slider w-full"
+            style={{ '--accent': c.accent } as React.CSSProperties}
+          />
+        </div>
+      </div>
+
       {/* ── Overlay ── */}
       <SectionLabel>Overlay en jeu</SectionLabel>
 

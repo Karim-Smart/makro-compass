@@ -22,12 +22,53 @@ const panel = params.get('panel') ?? 'stats'
 const ADVICE_QUEUE_MAX = 10
 const ADVICE_DISPLAY_MS = 30_000  // 30s par message (2x plus lent)
 
+// ─── TTS — voix mexicaine lisant du français ────────────────────────────────
+
+let cachedVoice: SpeechSynthesisVoice | null | undefined = undefined  // undefined = pas encore cherché
+
+function getMexicanVoice(): SpeechSynthesisVoice | null {
+  if (cachedVoice !== undefined) return cachedVoice
+  const voices = window.speechSynthesis?.getVoices() ?? []
+  cachedVoice = voices.find((v) => v.lang === 'es-MX')
+    ?? voices.find((v) => v.lang === 'es-419')
+    ?? voices.find((v) => v.lang.startsWith('es'))
+    ?? voices[0]
+    ?? null
+  return cachedVoice
+}
+
+function speak(text: string, volume: number): void {
+  if (!window.speechSynthesis) return
+  window.speechSynthesis.cancel()
+  const utterance = new SpeechSynthesisUtterance(text)
+  const voice = getMexicanVoice()
+  if (voice) utterance.voice = voice
+  utterance.lang = voice?.lang ?? 'es-MX'
+  utterance.volume = Math.max(0, Math.min(1, volume))
+  utterance.rate = 1.05
+  utterance.pitch = 0.95
+  window.speechSynthesis.speak(utterance)
+}
+
+// Recharger les voix dès qu'elles sont disponibles (Chrome les charge de façon asynchrone)
+if (typeof window !== 'undefined' && window.speechSynthesis) {
+  window.speechSynthesis.onvoiceschanged = () => {
+    cachedVoice = undefined  // reset le cache pour re-sélectionner
+  }
+}
+
+// ─── Composant principal ────────────────────────────────────────────────────
+
 export default function OverlayApp() {
   const [selectedStyle, setSelectedStyle] = useState<CoachingStyle>('LCK')
   const [gameData, setGameData] = useState<GameData | null>(null)
   const [timers, setTimers] = useState<ObjectiveTimers | null>(null)
   const [alert, setAlert] = useState<GameAlert | null>(null)
   const alertTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Settings voix (synchro depuis main via SETTINGS_UPDATE)
+  const voiceAlertsRef = useRef(true)
+  const voiceVolumeRef = useRef(0.8)
 
   // Runes et Build
   const [runePages, setRunePages] = useState<RunePageSet | null>(null)
@@ -92,8 +133,19 @@ export default function OverlayApp() {
 
     const onAlert = (newAlert: unknown) => {
       if (alertTimeoutRef.current) clearTimeout(alertTimeoutRef.current)
-      setAlert(newAlert as GameAlert)
+      const a = newAlert as GameAlert
+      setAlert(a)
       alertTimeoutRef.current = setTimeout(() => setAlert(null), 3_000)
+      // TTS — uniquement dans le panneau advice (évite 5 fenêtres en simultané)
+      if (panel === 'advice' && voiceAlertsRef.current) {
+        speak(a.message, voiceVolumeRef.current)
+      }
+    }
+
+    const onSettingsUpdate = (partial: unknown) => {
+      const s = partial as { voiceAlerts?: boolean; voiceVolume?: number }
+      if (s.voiceAlerts !== undefined) voiceAlertsRef.current = s.voiceAlerts
+      if (s.voiceVolume !== undefined) voiceVolumeRef.current = s.voiceVolume
     }
 
     const onGameData = (data: unknown) => {
@@ -168,12 +220,12 @@ export default function OverlayApp() {
     api.on(IPC.OVERLAY_BUILD, onBuild)
     api.on(IPC.REPLAY_DETECTED, onReplayDetected)
     api.on(IPC.OVERLAY_REVIEW, onOverlayReview)
+    api.on(IPC.SETTINGS_UPDATE, onSettingsUpdate)
 
     return () => {
       if (rotateTimerRef.current) clearInterval(rotateTimerRef.current)
       if (alertTimeoutRef.current) clearTimeout(alertTimeoutRef.current)
       if (reviewEventTimerRef.current) clearTimeout(reviewEventTimerRef.current)
-      // Nettoyer les listeners IPC pour éviter les fuites mémoire
       api.removeListener(IPC.STYLE_CHANGE, onStyleChange)
       api.removeListener(IPC.OVERLAY_SHOW_ADVICE, onAdvice)
       api.removeListener(IPC.OVERLAY_SHOW_ALERT, onAlert)
@@ -184,6 +236,7 @@ export default function OverlayApp() {
       api.removeListener(IPC.OVERLAY_BUILD, onBuild)
       api.removeListener(IPC.REPLAY_DETECTED, onReplayDetected)
       api.removeListener(IPC.OVERLAY_REVIEW, onOverlayReview)
+      api.removeListener(IPC.SETTINGS_UPDATE, onSettingsUpdate)
     }
   }, [])
 
