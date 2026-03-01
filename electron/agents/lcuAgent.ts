@@ -332,7 +332,7 @@ interface LcuMatchParticipant {
 
 interface LcuMatchIdentity {
   participantId: number
-  player: { accountId: string; summonerId: number; summonerName: string }
+  player: { accountId: string; currentAccountId?: string; summonerId: number; summonerName: string }
 }
 
 interface LcuMatchHistoryGame {
@@ -563,8 +563,7 @@ export async function startLcuAgent(): Promise<void> {
         pollTimer = setInterval(poll, LCU_POLL_MS)
         gameflowPollTimer = setInterval(pollGameflow, 5000)
         if (!hasImportedGames && Object.keys(championMap).length > 0) {
-          hasImportedGames = true
-          importRecentRankedGames(5)
+          importRecentRankedGames(5).then((n) => { if (n > 0) hasImportedGames = true })
         }
       } else if (connectionAttempts % 10 === 0) {
         console.debug(`[LCUAgent] Toujours pas de client (${connectionAttempts} tentatives)`)
@@ -587,8 +586,7 @@ export async function startLcuAgent(): Promise<void> {
 
   // Import des 5 dernières parties classées (seulement si la champion map est chargée)
   if (!hasImportedGames && Object.keys(championMap).length > 0) {
-    hasImportedGames = true
-    importRecentRankedGames(5)
+    importRecentRankedGames(5).then((n) => { if (n > 0) hasImportedGames = true })
   }
 }
 

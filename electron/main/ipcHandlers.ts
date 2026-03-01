@@ -6,7 +6,7 @@ import { startRiotAgent, stopRiotAgent } from '../agents/riotAgent'
 import { setCoachingStyle, setApiKey, getCoachingStyle, startAICoachAgent, stopAICoachAgent } from '../agents/aiCoachAgent'
 import { getSubscriptionStatus } from '../agents/subscriptionAgent'
 import { startTimerAgent, stopTimerAgent } from '../agents/timerAgent'
-import { startLcuAgent, stopLcuAgent, exportRunePageToClient, launchReplay } from '../agents/lcuAgent'
+import { startLcuAgent, stopLcuAgent, exportRunePageToClient, launchReplay, importRecentRankedGames } from '../agents/lcuAgent'
 import { getAdviceHistory, getQuotaStatus, getRankedHistory } from '../agents/quotaManager'
 import { generateBuildRecommendations } from '../agents/buildEngine'
 import { generateReviewTimeline } from '../agents/reviewEngine'
@@ -129,6 +129,11 @@ export function setupIpcHandlers(
   // Lancer le replay d'une partie via le client LoL
   ipcMain.handle(IPC.LAUNCH_REPLAY, async (_event, gameId: number) => {
     return launchReplay(gameId)
+  })
+
+  // Import manuel de l'historique LCU (bouton Actualiser dans Stats)
+  ipcMain.handle(IPC.RANKED_HISTORY_IMPORT, async () => {
+    return importRecentRankedGames(10)
   })
 
   // Changement de rôle (depuis la page Draft)

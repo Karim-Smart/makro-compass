@@ -51,6 +51,9 @@ export const IPC = {
 
   // Import automatique de l'historique LCU au démarrage
   RANKED_IMPORT_DONE: 'ranked:import-done',
+
+  // Déclencher manuellement l'import LCU (invoke → retourne le nb de parties importées)
+  RANKED_HISTORY_IMPORT: 'ranked:history-import',
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

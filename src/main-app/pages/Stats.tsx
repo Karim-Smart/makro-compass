@@ -46,6 +46,8 @@ export default function Stats() {
   const [openReviewId, setOpenReviewId] = useState<number | null>(null)
   // Feedback quand le replay est lancé
   const [launchingReplay, setLaunchingReplay] = useState<number | null>(null)
+  // Import manuel en cours
+  const [importing, setImporting] = useState(false)
 
   // Rechargement quand l'onglet change ou quand l'import LCU termine
   useEffect(() => {
@@ -86,6 +88,17 @@ export default function Stats() {
     }
   }
 
+  // Import manuel depuis le client LoL
+  async function handleImport() {
+    setImporting(true)
+    try {
+      await window.electronAPI.invoke(IPC.RANKED_HISTORY_IMPORT)
+      setRefreshKey((k) => k + 1)
+    } finally {
+      setImporting(false)
+    }
+  }
+
   // Lance le replay via le client LoL
   async function handleLaunchReplay(gameId: number) {
     setLaunchingReplay(gameId)
@@ -121,6 +134,15 @@ export default function Stats() {
               )}
             </p>
           </div>
+          <button
+            onClick={handleImport}
+            disabled={importing}
+            className="text-[10px] font-bold px-3 py-1 rounded-full transition-all duration-150 disabled:opacity-40"
+            style={{ backgroundColor: `${c.accent}20`, color: c.accent, border: `1px solid ${c.accent}40` }}
+            title="Importer depuis le client LoL"
+          >
+            {importing ? '...' : 'Actualiser'}
+          </button>
         </div>
 
         {/* Sub-tabs Solo/Duo — Flex */}

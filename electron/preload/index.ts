@@ -41,6 +41,7 @@ const electronAPI = {
       IPC.RANKED_HISTORY,
       IPC.REVIEW_GENERATE,
       IPC.LAUNCH_REPLAY,
+      IPC.RANKED_HISTORY_IMPORT,
     ]
     if (validChannels.includes(channel as (typeof validChannels)[number])) {
       return ipcRenderer.invoke(channel, data)
