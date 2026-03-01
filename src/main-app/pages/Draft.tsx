@@ -1,14 +1,59 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useDraftStore } from '../stores/draftStore'
 import { useCoachingStore } from '../stores/coachingStore'
 import { ROLE_POOL, CHAMPION_RUNES, CHAMPION_COUNTERS, CHAMPION_SYNERGIES, getSynergyScore, deduceEnemyRoles, generateMatchupAnalysis, generateLockReaction } from '../../../shared/draft-data'
 import type { MatchupAnalysis } from '../../../shared/draft-data'
 import { CHAMPIONS, getChampion } from '../../../shared/champion-data'
+import type { ChampionClass } from '../../../shared/champion-data'
 import { getChampionLoadingUrl } from '../../../shared/champion-images'
 import { getMatchupWinrate } from '../../../shared/matchup-winrates'
 import { COACHING_STYLES } from '../../../shared/constants'
 import type { PlayerRole, ChampionRecommendation } from '../../../shared/types'
 import DraftOraclePanel from '../components/DraftOraclePanel'
+
+// ─── Analyse de composition ──────────────────────────────────────────────────
+
+type CompTag = 'engage' | 'burst' | 'poke' | 'sustain' | 'splitpush' | 'teamfight'
+
+const COMP_TAG_META: Record<CompTag, { label: string; color: string; icon: string }> = {
+  engage:    { label: 'Engage',    color: '#ef4444', icon: '🛡️' },
+  burst:     { label: 'Burst',     color: '#f97316', icon: '💥' },
+  poke:      { label: 'Poke',      color: '#3b82f6', icon: '🎯' },
+  sustain:   { label: 'Sustain',   color: '#22c55e', icon: '💚' },
+  splitpush: { label: 'Split',     color: '#a855f7', icon: '🗡️' },
+  teamfight: { label: 'Teamfight', color: '#eab308', icon: '⚔️' },
+}
+
+const CLASS_TO_TAGS: Record<ChampionClass, CompTag[]> = {
+  assassin:   ['burst', 'splitpush'],
+  mage:       ['poke', 'teamfight', 'burst'],
+  marksman:   ['teamfight', 'sustain'],
+  bruiser:    ['splitpush', 'sustain'],
+  tank:       ['engage', 'teamfight'],
+  enchanter:  ['sustain', 'poke'],
+  engage:     ['engage', 'teamfight'],
+  skirmisher: ['splitpush', 'burst'],
+}
+
+function computeCompProfile(picks: string[]): Record<CompTag, number> {
+  const profile: Record<CompTag, number> = { engage: 0, burst: 0, poke: 0, sustain: 0, splitpush: 0, teamfight: 0 }
+  for (const name of picks) {
+    if (!name) continue
+    const info = getChampion(name)
+    if (!info) continue
+    const tags = CLASS_TO_TAGS[info.class] ?? []
+    for (const tag of tags) profile[tag]++
+  }
+  return profile
+}
+
+function getWinCondition(profile: Record<CompTag, number>): { label: string; color: string } | null {
+  const entries = Object.entries(profile) as [CompTag, number][]
+  const sorted = entries.sort((a, b) => b[1] - a[1])
+  if (sorted[0][1] === 0) return null
+  const meta = COMP_TAG_META[sorted[0][0]]
+  return { label: meta.label, color: meta.color }
+}
 
 const ROLES: { key: PlayerRole; label: string; icon: string }[] = [
   { key: 'TOP',     label: 'Top',     icon: '⚔️' },
@@ -91,11 +136,31 @@ export default function Draft() {
     })
   }
 
+  // Profils de composition des deux équipes
+  const allyProfile = useMemo(() => computeCompProfile(allyPicks), [allyPicks])
+  const enemyProfile = useMemo(() => computeCompProfile(enemyPicks), [enemyPicks])
+  const allyWinCond = useMemo(() => getWinCondition(allyProfile), [allyProfile])
+  const enemyWinCond = useMemo(() => getWinCondition(enemyProfile), [enemyProfile])
+  const hasAnyPick = allyPicks.some(Boolean) || enemyPicks.some(Boolean)
+
+  // Score global du draft (basé sur les matchup winrates moyennes)
+  const draftScore = useMemo(() => {
+    const lanes = ROLES.map((_, roleIdx) => {
+      const ally = allyPicks[roleIdx] ?? ''
+      const enemyPickIdx = enemyRoleMap[roleIdx]
+      const enemy = enemyPickIdx >= 0 ? enemyPicks[enemyPickIdx] : ''
+      if (!ally || !enemy) return null
+      return getMatchupWinrate(ally, enemy)
+    }).filter((x): x is number => x !== null)
+    if (lanes.length === 0) return null
+    return Math.round(lanes.reduce((a, b) => a + b, 0) / lanes.length)
+  }, [allyPicks, enemyPicks, enemyRoleMap])
+
   return (
     <div className="flex flex-col gap-3 p-4 max-w-2xl mx-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 48px)' }}>
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold text-white">Draft Advisor</h1>
+        <h1 className="text-lg font-bold" style={{ color: '#F0E6D2', fontFamily: 'Cinzel, serif' }}>Draft Advisor</h1>
         <div className="flex items-center gap-2">
           <span
             className="w-2 h-2 rounded-full"
@@ -109,7 +174,7 @@ export default function Draft() {
 
       {/* Role Selector */}
       <div>
-        <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-2 block">
+        <span className="text-xs font-semibold uppercase tracking-wider mb-2 block" style={{ color: '#C89B3C90' }}>
           Ton rôle
         </span>
         <div className="flex gap-2">
@@ -119,10 +184,11 @@ export default function Draft() {
               onClick={() => setRole(r.key)}
               className="flex flex-col items-center gap-1 px-3 py-2 clip-bevel transition-all"
               style={{
-                backgroundColor: role === r.key ? '#7c3aed20' : '#ffffff08',
-                border: `1px solid ${role === r.key ? '#7c3aed' : '#ffffff15'}`,
-                color: role === r.key ? '#c4b5fd' : '#9ca3af',
+                backgroundColor: role === r.key ? '#C89B3C18' : '#ffffff08',
+                border: `1px solid ${role === r.key ? '#C89B3C' : '#ffffff15'}`,
+                color: role === r.key ? '#F0E6D2' : '#9ca3af',
                 transform: role === r.key ? 'scale(1.05)' : 'scale(1)',
+                boxShadow: role === r.key ? '0 0 12px rgba(200, 155, 60, 0.15)' : 'none',
               }}
             >
               <span className="text-base">{r.icon}</span>
@@ -199,6 +265,17 @@ export default function Draft() {
         enemyRoleMap={enemyRoleMap}
       />
 
+      {/* Composition analysis — profil visuel des deux équipes */}
+      {hasAnyPick && (
+        <TeamCompAnalysis
+          allyProfile={allyProfile}
+          enemyProfile={enemyProfile}
+          allyWinCond={allyWinCond}
+          enemyWinCond={enemyWinCond}
+          draftScore={draftScore}
+        />
+      )}
+
       {/* Drop Zone — Matchup mechanics */}
       <MatchupDropZone
         myChampion={myChamp}
@@ -218,18 +295,18 @@ export default function Draft() {
         <RecommendationList recommendations={recommendations} role={role} />
       )}
 
-      {/* Composition analysis */}
+      {/* Composition analysis — tips textuels */}
       {compTips.length > 0 && (
         <div>
-          <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-2 block">
-            Analyse de la comp ennemie
+          <span className="text-xs font-semibold uppercase tracking-wider mb-2 block" style={{ color: '#C89B3C90' }}>
+            Conseils vs cette comp
           </span>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 stagger-enter">
             {compTips.map((tip, i) => (
               <div
                 key={i}
                 className="text-xs px-3 py-2 clip-bevel"
-                style={{ backgroundColor: '#f59e0b10', border: '1px solid #f59e0b30', color: '#fcd34d' }}
+                style={{ backgroundColor: '#C89B3C08', border: '1px solid #C89B3C25', color: '#F0E6D2' }}
               >
                 {tip}
               </div>
@@ -276,7 +353,7 @@ export default function Draft() {
 // ─── Champion Input avec image draggable + autocomplete ──────────────────────
 
 function ChampionInput({
-  value, placeholder, onChange, accent = '#7c3aed', side, allyPicks = [], enemyPicks = [],
+  value, placeholder, onChange, accent = '#C89B3C', side, allyPicks = [], enemyPicks = [],
 }: {
   value: string; placeholder: string; onChange: (v: string) => void; accent?: string
   side?: 'ally' | 'enemy'; allyPicks?: string[]; enemyPicks?: string[]
@@ -378,7 +455,7 @@ function ChampionInput({
               <button
                 key={champ}
                 onMouseDown={() => selectChamp(champ)}
-                className="w-full text-left px-2 py-1.5 text-xs hover:bg-violet-500/20 transition-colors flex items-center gap-2"
+                className="w-full text-left px-2 py-1.5 text-xs hover:bg-amber-700/20 transition-colors flex items-center gap-2"
               >
                 <img
                   src={suggImgUrl}
@@ -482,8 +559,8 @@ function EnemyRoleSlot({
         onMouseLeave={handleMouseLeave}
         className="w-9 h-9 clip-hex mb-1 overflow-hidden flex-shrink-0 transition-all"
         style={{
-          border: dragOver ? '2px solid #7c3aed' : pick ? '2px solid #ef444480' : '2px solid #ffffff10',
-          backgroundColor: dragOver ? '#7c3aed15' : '#ffffff08',
+          border: dragOver ? '2px solid #C89B3C' : pick ? '2px solid #ef444480' : '2px solid #ffffff10',
+          backgroundColor: dragOver ? '#C89B3C15' : '#ffffff08',
           cursor: pick ? 'grab' : 'default',
           transform: dragOver ? 'scale(1.15)' : 'scale(1)',
         }}
@@ -534,7 +611,7 @@ function EnemyRoleSlot({
               <button
                 key={champ}
                 onMouseDown={() => selectChamp(champ)}
-                className="w-full text-left px-2 py-1.5 text-xs hover:bg-violet-500/20 transition-colors flex items-center gap-2"
+                className="w-full text-left px-2 py-1.5 text-xs hover:bg-amber-700/20 transition-colors flex items-center gap-2"
               >
                 <img
                   src={suggImgUrl}
@@ -582,7 +659,7 @@ function ChampionHoverTooltip({
   const synergy = getSynergyScore(champion, filledAllies)
 
   const powerColors: Record<string, string> = {
-    early: '#ef4444', mid: '#f59e0b', late: '#22c55e', all: '#7c3aed',
+    early: '#ef4444', mid: '#f59e0b', late: '#22c55e', all: '#C89B3C',
   }
   const powerLabels: Record<string, string> = {
     early: 'Early', mid: 'Mid', late: 'Late', all: 'All',
@@ -599,8 +676,8 @@ function ChampionHoverTooltip({
         top: '-8px',
         left: '50%',
         transform: 'translate(-50%, -100%)',
-        border: '1px solid #7c3aed40',
-        backgroundColor: '#111027',
+        border: '1px solid #C89B3C40',
+        backgroundColor: '#0A1628',
         animation: 'tooltipIn 0.15s ease-out',
       }}
     >
@@ -610,14 +687,14 @@ function ChampionHoverTooltip({
           src={imgUrl}
           alt={champion}
           className="w-10 h-10 clip-hex object-cover object-top flex-shrink-0"
-          style={{ border: '2px solid #7c3aed50' }}
+          style={{ border: '2px solid #C89B3C50' }}
           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
         />
         <div className="min-w-0">
           <div className="text-sm font-bold text-white">{champion}</div>
           {info && (
             <div className="flex gap-1.5 mt-0.5">
-              <span className="text-[8px] font-bold uppercase px-1.5 py-px rounded" style={{ backgroundColor: '#ffffff10', color: '#c4b5fd' }}>
+              <span className="text-[8px] font-bold uppercase px-1.5 py-px rounded" style={{ backgroundColor: '#ffffff10', color: '#F0E6D2' }}>
                 {classLabels[info.class] ?? info.class}
               </span>
               <span className="text-[8px] font-bold uppercase px-1.5 py-px rounded" style={{ backgroundColor: `${powerColors[info.power]}15`, color: powerColors[info.power] }}>
@@ -759,7 +836,7 @@ function ChampionHoverTooltip({
           width: 0, height: 0,
           borderLeft: '6px solid transparent',
           borderRight: '6px solid transparent',
-          borderTop: '6px solid #111027',
+          borderTop: '6px solid #0A1628',
         }}
       />
 
@@ -796,10 +873,10 @@ function LaneMatchups({
 
   return (
     <div>
-      <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-2 block">
+      <span className="text-xs font-semibold uppercase tracking-wider mb-2 block" style={{ color: '#C89B3C90' }}>
         Matchups par lane
       </span>
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-1.5 stagger-enter">
         {lanes.map(({ role, ally, enemy, winrate, enemyWinrate }) => {
           const allyWins = winrate >= 50
           const allyImgUrl = getChampionLoadingUrl(ally)
@@ -808,8 +885,8 @@ function LaneMatchups({
           return (
             <div
               key={role.key}
-              className="flex items-center gap-2 px-3 py-2 clip-bevel"
-              style={{ backgroundColor: '#ffffff06', border: '1px solid #ffffff08' }}
+              className="flex items-center gap-2 px-3 py-2 clip-bevel hextech-card"
+              style={{ backgroundColor: '#0A162890', border: '1px solid #C89B3C15' }}
             >
               {/* Role */}
               <span className="text-[9px] font-bold uppercase text-gray-500 w-10 text-center flex-shrink-0">
@@ -915,21 +992,21 @@ function MatchupDropZone({
         onDrop={handleDrop}
         className="flex flex-col items-center justify-center py-4 clip-bevel-lg transition-all"
         style={{
-          border: `2px dashed ${hovering ? '#7c3aed' : '#ffffff15'}`,
-          backgroundColor: hovering ? '#7c3aed10' : 'transparent',
+          border: `2px dashed ${hovering ? '#C89B3C' : '#ffffff15'}`,
+          backgroundColor: hovering ? '#C89B3C10' : 'transparent',
         }}
       >
         <div
           className="w-14 h-14 clip-hex flex items-center justify-center transition-all"
           style={{
-            border: `2px dashed ${hovering ? '#7c3aed' : '#ffffff20'}`,
-            backgroundColor: hovering ? '#7c3aed15' : '#ffffff05',
+            border: `2px dashed ${hovering ? '#C89B3C' : '#ffffff20'}`,
+            backgroundColor: hovering ? '#C89B3C15' : '#ffffff05',
             transform: hovering ? 'scale(1.1)' : 'scale(1)',
           }}
         >
           <span className="text-lg" style={{ opacity: hovering ? 1 : 0.4 }}>⚔️</span>
         </div>
-        <span className="text-[10px] mt-2" style={{ color: hovering ? '#c4b5fd' : '#6b7280' }}>
+        <span className="text-[10px] mt-2" style={{ color: hovering ? '#F0E6D2' : '#6b7280' }}>
           {hovering ? 'Lâche pour analyser le matchup' : 'Glisse un ennemi ici pour voir les mécaniques du matchup'}
         </span>
       </div>
@@ -950,7 +1027,7 @@ function MatchupDropZone({
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       className="clip-bevel-lg overflow-hidden"
-      style={{ border: `1px solid ${adv.border}`, backgroundColor: '#0d0b1e' }}
+      style={{ border: `1px solid ${adv.border}`, backgroundColor: '#0A1628' }}
     >
       {/* Header */}
       <div className="flex items-center gap-3 p-3" style={{ borderBottom: '1px solid #ffffff10' }}>
@@ -1044,7 +1121,7 @@ function LockReactionBanner({ champion, text }: { champion: string; text: string
   const imgUrl = getChampionLoadingUrl(champion)
   const info = getChampion(champion)
   const dangerColors = !info?.dangerLevel || info.dangerLevel <= 1
-    ? { bg: '#7c3aed10', border: '#7c3aed40', accent: '#c4b5fd' }
+    ? { bg: '#C89B3C10', border: '#C89B3C40', accent: '#F0E6D2' }
     : info.dangerLevel === 2
     ? { bg: '#f59e0b10', border: '#f59e0b40', accent: '#fcd34d' }
     : { bg: '#ef444410', border: '#ef444440', accent: '#fca5a5' }
@@ -1101,10 +1178,10 @@ function RecommendationList({
 
   return (
     <div>
-      <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-2 block">
+      <span className="text-xs font-semibold uppercase tracking-wider mb-2 block" style={{ color: '#C89B3C90' }}>
         Picks recommandés {role}
       </span>
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 stagger-enter">
         {recommendations.map((rec, i) => {
           const imgUrl = getChampionLoadingUrl(rec.champion)
           const sColor = scoreColor(rec.score)
@@ -1116,7 +1193,7 @@ function RecommendationList({
               onDragStart={(e) => startDrag(e, rec.champion)}
               className="flex items-start gap-3 px-3 py-2.5 clip-bevel-lg transition-all hover:bg-white/5"
               style={{
-                border: isTop ? `1px solid ${sColor}40` : '1px solid #7c3aed25',
+                border: isTop ? `1px solid ${sColor}40` : '1px solid #C89B3C18',
                 backgroundColor: isTop ? `${sColor}08` : 'transparent',
                 cursor: 'grab',
                 boxShadow: isTop ? `0 0 16px ${sColor}10` : 'none',
@@ -1133,7 +1210,7 @@ function RecommendationList({
                 />
                 <div
                   className="absolute -top-1 -left-1 w-4 h-4 clip-bevel-sm flex items-center justify-center text-[9px] font-black"
-                  style={{ backgroundColor: '#0d0b1e', border: `1.5px solid ${medalColors[i]}`, color: medalColors[i] }}
+                  style={{ backgroundColor: '#0A1628', border: `1.5px solid ${medalColors[i]}`, color: medalColors[i] }}
                 >
                   {i + 1}
                 </div>
@@ -1190,7 +1267,7 @@ function RecommendationList({
 function RuneBadge({ label, type }: { label: string; type: 'keystone' | 'primary' | 'secondary' }) {
   const colors = {
     keystone:  { bg: '#f59e0b20', border: '#f59e0b50', color: '#fcd34d' },
-    primary:   { bg: '#7c3aed15', border: '#7c3aed40', color: '#c4b5fd' },
+    primary:   { bg: '#C89B3C15', border: '#C89B3C40', color: '#F0E6D2' },
     secondary: { bg: '#22c55e15', border: '#22c55e40', color: '#86efac' },
   }
   const c = colors[type]
@@ -1226,7 +1303,8 @@ function RuneLookup({ role }: { role: PlayerRole }) {
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder={`Chercher un champion ${role}...`}
-        className="w-full text-xs px-3 py-2 clip-bevel bg-white/5 border border-white/10 text-white placeholder-gray-600 outline-none focus:border-violet-500 transition-colors"
+        className="w-full text-xs px-3 py-2 clip-bevel bg-white/5 border border-white/10 text-white placeholder-gray-600 outline-none transition-colors"
+        style={{ borderColor: search ? '#C89B3C50' : undefined }}
       />
       {match && runes && (
         <div className="mt-2 px-3 py-2.5 clip-bevel flex items-center gap-3" style={{ backgroundColor: '#ffffff06', border: '1px solid #ffffff10' }}>
@@ -1234,7 +1312,7 @@ function RuneLookup({ role }: { role: PlayerRole }) {
             src={imgUrl}
             alt={match}
             className="w-10 h-10 clip-hex object-cover object-top flex-shrink-0"
-            style={{ border: '2px solid #7c3aed40' }}
+            style={{ border: '2px solid #C89B3C40' }}
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
           />
           <div>
@@ -1248,6 +1326,132 @@ function RuneLookup({ role }: { role: PlayerRole }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Team Composition Analysis ──────────────────────────────────────────────
+
+function TeamCompAnalysis({
+  allyProfile,
+  enemyProfile,
+  allyWinCond,
+  enemyWinCond,
+  draftScore,
+}: {
+  allyProfile: Record<CompTag, number>
+  enemyProfile: Record<CompTag, number>
+  allyWinCond: { label: string; color: string } | null
+  enemyWinCond: { label: string; color: string } | null
+  draftScore: number | null
+}) {
+  const tags = Object.keys(COMP_TAG_META) as CompTag[]
+  const maxVal = Math.max(
+    ...tags.map((t) => allyProfile[t]),
+    ...tags.map((t) => enemyProfile[t]),
+    1,
+  )
+
+  const hasAlly = tags.some((t) => allyProfile[t] > 0)
+  const hasEnemy = tags.some((t) => enemyProfile[t] > 0)
+  if (!hasAlly && !hasEnemy) return null
+
+  return (
+    <div className="clip-bevel-lg overflow-hidden" style={{ border: '1px solid #C89B3C20', backgroundColor: '#0A1628' }}>
+      {/* Header avec score global */}
+      <div className="flex items-center justify-between px-3 pt-2.5 pb-1.5" style={{ borderBottom: '1px solid #C89B3C15' }}>
+        <span className="text-[9px] font-black uppercase tracking-[0.2em]" style={{ color: '#C89B3C' }}>
+          Profil de composition
+        </span>
+        {draftScore !== null && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-[8px] font-mono font-bold" style={{ color: '#A0A7B4' }}>
+              DRAFT
+            </span>
+            <span
+              className="text-xs font-black font-mono"
+              style={{ color: draftScore >= 55 ? '#22c55e' : draftScore >= 45 ? '#f59e0b' : '#ef4444' }}
+            >
+              {draftScore}%
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Barres comparatives */}
+      <div className="px-3 py-2.5 flex flex-col gap-1.5">
+        {tags.map((tag) => {
+          const meta = COMP_TAG_META[tag]
+          const allyVal = allyProfile[tag]
+          const enemyVal = enemyProfile[tag]
+          if (allyVal === 0 && enemyVal === 0) return null
+
+          const allyPct = (allyVal / maxVal) * 100
+          const enemyPct = (enemyVal / maxVal) * 100
+
+          return (
+            <div key={tag} className="flex items-center gap-2">
+              <span className="text-[10px] w-16 text-right flex-shrink-0 flex items-center justify-end gap-1" style={{ color: meta.color }}>
+                <span>{meta.icon}</span>
+                <span className="font-bold">{meta.label}</span>
+              </span>
+
+              {/* Barre allié (gauche) */}
+              <div className="flex-1 flex justify-end">
+                <div className="h-2 rounded-full" style={{
+                  width: `${allyPct}%`,
+                  minWidth: allyVal > 0 ? 8 : 0,
+                  backgroundColor: '#22c55e',
+                  opacity: 0.7,
+                  transition: 'width 0.3s ease',
+                }} />
+              </div>
+
+              {/* Séparateur */}
+              <div className="w-px h-3 flex-shrink-0" style={{ backgroundColor: '#C89B3C30' }} />
+
+              {/* Barre ennemi (droite) */}
+              <div className="flex-1 flex justify-start">
+                <div className="h-2 rounded-full" style={{
+                  width: `${enemyPct}%`,
+                  minWidth: enemyVal > 0 ? 8 : 0,
+                  backgroundColor: '#ef4444',
+                  opacity: 0.7,
+                  transition: 'width 0.3s ease',
+                }} />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Win conditions */}
+      {(allyWinCond || enemyWinCond) && (
+        <div className="flex items-center justify-between px-3 pb-2" style={{ borderTop: '1px solid #C89B3C10' }}>
+          {allyWinCond ? (
+            <span className="text-[8px] font-black uppercase tracking-wider" style={{ color: '#22c55e90' }}>
+              Notre force : {allyWinCond.label}
+            </span>
+          ) : <span />}
+          {enemyWinCond ? (
+            <span className="text-[8px] font-black uppercase tracking-wider" style={{ color: '#ef444490' }}>
+              Leur force : {enemyWinCond.label}
+            </span>
+          ) : <span />}
+        </div>
+      )}
+
+      {/* Légende */}
+      <div className="flex items-center justify-center gap-4 pb-2">
+        <span className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#22c55e' }} />
+          <span className="text-[7px] font-mono text-gray-500">ALLIÉS</span>
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#ef4444' }} />
+          <span className="text-[7px] font-mono text-gray-500">ENNEMIS</span>
+        </span>
+      </div>
     </div>
   )
 }
