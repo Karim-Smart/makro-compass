@@ -43,13 +43,13 @@ export const RUNE_TREES: RuneTree[] = [
     ],
     tiers: [
       { runes: [
-        { id: 9101, name: 'Overheal', icon: 'Styles/Precision/Overheal.png' },
+        { id: 9101, name: 'Absorb Life', icon: 'Styles/Precision/Overheal.png' },
         { id: 9111, name: 'Triumph', icon: 'Styles/Precision/Triumph.png' },
         { id: 8009, name: 'Presence of Mind', icon: 'Styles/Precision/PresenceOfMind/PresenceOfMind.png' },
       ]},
       { runes: [
         { id: 9104, name: 'Legend: Alacrity', icon: 'Styles/Precision/LegendAlacrity/LegendAlacrity.png' },
-        { id: 9105, name: 'Legend: Tenacity', icon: 'Styles/Precision/LegendTenacity/LegendTenacity.png' },
+        { id: 9105, name: 'Legend: Haste', icon: 'Styles/Precision/LegendTenacity/LegendTenacity.png' },
         { id: 9103, name: 'Legend: Bloodline', icon: 'Styles/Precision/LegendBloodline/LegendBloodline.png' },
       ]},
       { runes: [
@@ -67,7 +67,6 @@ export const RUNE_TREES: RuneTree[] = [
     icon: 'Styles/7200_Domination.png',
     keystones: [
       { id: 8112, name: 'Electrocute', icon: 'Styles/Domination/Electrocute/Electrocute.png' },
-      { id: 8124, name: 'Predator', icon: 'Styles/Domination/Predator/Predator.png' },
       { id: 8128, name: 'Dark Harvest', icon: 'Styles/Domination/DarkHarvest/DarkHarvest.png' },
       { id: 9923, name: 'Hail of Blades', icon: 'Styles/Domination/HailOfBlades/HailOfBlades.png' },
     ],
@@ -78,14 +77,14 @@ export const RUNE_TREES: RuneTree[] = [
         { id: 8143, name: 'Sudden Impact', icon: 'Styles/Domination/SuddenImpact/SuddenImpact.png' },
       ]},
       { runes: [
-        { id: 8136, name: 'Zombie Ward', icon: 'Styles/Domination/ZombieWard/ZombieWard.png' },
-        { id: 8120, name: 'Ghost Poro', icon: 'Styles/Domination/GhostPoro/GhostPoro.png' },
-        { id: 8138, name: 'Eyeball Collection', icon: 'Styles/Domination/EyeballCollection/EyeballCollection.png' },
+        { id: 8137, name: 'Sixth Sense', icon: 'Styles/Domination/ZombieWard/ZombieWard.png' },
+        { id: 8140, name: 'Grisly Mementos', icon: 'Styles/Domination/GhostPoro/GhostPoro.png' },
+        { id: 8141, name: 'Deep Ward', icon: 'Styles/Domination/EyeballCollection/EyeballCollection.png' },
       ]},
       { runes: [
         { id: 8135, name: 'Treasure Hunter', icon: 'Styles/Domination/TreasureHunter/TreasureHunter.png' },
-        { id: 8134, name: 'Ingenious Hunter', icon: 'Styles/Domination/IngeniousHunter/IngeniousHunter.png' },
         { id: 8105, name: 'Relentless Hunter', icon: 'Styles/Domination/RelentlessHunter/RelentlessHunter.png' },
+        { id: 8106, name: 'Ultimate Hunter', icon: 'Styles/Domination/IngeniousHunter/IngeniousHunter.png' },
       ]},
     ],
   },
@@ -102,7 +101,7 @@ export const RUNE_TREES: RuneTree[] = [
     ],
     tiers: [
       { runes: [
-        { id: 8224, name: 'Nullifying Orb', icon: 'Styles/Sorcery/NullifyingOrb/Pokeshield.png' },
+        { id: 8224, name: 'Axiom Arcanist', icon: 'Styles/Sorcery/NullifyingOrb/Pokeshield.png' },
         { id: 8226, name: 'Manaflow Band', icon: 'Styles/Sorcery/ManaflowBand/ManaflowBand.png' },
         { id: 8275, name: 'Nimbus Cloak', icon: 'Styles/Sorcery/NimbusCloak/6361.png' },
       ]},
@@ -162,17 +161,17 @@ export const RUNE_TREES: RuneTree[] = [
       { runes: [
         { id: 8306, name: 'Hextech Flashtraption', icon: 'Styles/Inspiration/HextechFlashtraption/HextechFlashtraption.png' },
         { id: 8304, name: 'Magical Footwear', icon: 'Styles/Inspiration/MagicalFootwear/MagicalFootwear.png' },
-        { id: 8313, name: 'Triple Tonic', icon: 'Styles/Inspiration/PerfectTiming/PerfectTiming.png' },
+        { id: 8321, name: 'Cash Back', icon: 'Styles/Inspiration/FuturesMarket/FuturesMarket.png' },
       ]},
       { runes: [
-        { id: 8321, name: 'Future\'s Market', icon: 'Styles/Inspiration/FuturesMarket/FuturesMarket.png' },
-        { id: 8316, name: 'Minion Dematerializer', icon: 'Styles/Inspiration/MinionDematerializer/MinionDematerializer.png' },
+        { id: 8313, name: 'Triple Tonic', icon: 'Styles/Inspiration/PerfectTiming/PerfectTiming.png' },
+        { id: 8352, name: 'Time Warp Tonic', icon: 'Styles/Inspiration/TimeWarpTonic/TimeWarpTonic.png' },
         { id: 8345, name: 'Biscuit Delivery', icon: 'Styles/Inspiration/BiscuitDelivery/BiscuitDelivery.png' },
       ]},
       { runes: [
         { id: 8347, name: 'Cosmic Insight', icon: 'Styles/Inspiration/CosmicInsight/CosmicInsight.png' },
         { id: 8410, name: 'Approach Velocity', icon: 'Styles/Inspiration/ApproachVelocity/ApproachVelocity.png' },
-        { id: 8352, name: 'Time Warp Tonic', icon: 'Styles/Inspiration/TimeWarpTonic/TimeWarpTonic.png' },
+        { id: 8316, name: 'Jack Of All Trades', icon: 'Styles/Inspiration/MinionDematerializer/MinionDematerializer.png' },
       ]},
     ],
   },
@@ -216,9 +215,9 @@ const TREE_DEFAULTS: Record<number, Record<string, TierPicks>> = {
   },
   // Domination
   8100: {
-    standard:  [1, 2, 0],  // Taste of Blood, Eyeball, Treasure Hunter
-    offensive: [2, 2, 0],  // Sudden Impact, Eyeball, Treasure Hunter
-    defensive: [1, 0, 1],  // Taste of Blood, Zombie Ward, Ingenious Hunter
+    standard:  [1, 1, 0],  // Taste of Blood, Grisly Mementos, Treasure Hunter
+    offensive: [2, 1, 0],  // Sudden Impact, Grisly Mementos, Treasure Hunter
+    defensive: [1, 0, 1],  // Taste of Blood, Sixth Sense, Relentless Hunter
   },
   // Sorcery
   8200: {
@@ -235,8 +234,8 @@ const TREE_DEFAULTS: Record<number, Record<string, TierPicks>> = {
   // Inspiration
   8300: {
     standard:  [1, 2, 0],  // Magical Footwear, Biscuit, Cosmic Insight
-    offensive: [0, 0, 0],  // Hexflash, Future's Market, Cosmic Insight
-    defensive: [1, 2, 2],  // Magical Footwear, Biscuit, Time Warp Tonic
+    offensive: [0, 0, 0],  // Hexflash, Triple Tonic, Cosmic Insight
+    defensive: [1, 2, 2],  // Magical Footwear, Biscuit, Jack Of All Trades
   },
 }
 

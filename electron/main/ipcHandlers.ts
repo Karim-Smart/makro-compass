@@ -7,7 +7,7 @@ import { setCoachingStyle, setApiKey, getCoachingStyle, startAICoachAgent, stopA
 import { getSubscriptionStatus } from '../agents/subscriptionAgent'
 import { startTimerAgent, stopTimerAgent } from '../agents/timerAgent'
 import { startLcuAgent, stopLcuAgent, exportRunePageToClient } from '../agents/lcuAgent'
-import { getAdviceHistory, getQuotaStatus } from '../agents/quotaManager'
+import { getAdviceHistory, getQuotaStatus, getRankedHistory } from '../agents/quotaManager'
 import { generateBuildRecommendations } from '../agents/buildEngine'
 import { generateRunePages } from '../../shared/rune-data'
 import { getOverlayWindows } from './windowManager'
@@ -110,6 +110,10 @@ export function setupIpcHandlers(
 
   ipcMain.handle(IPC.QUOTA_STATUS, () => {
     return getQuotaStatus()
+  })
+
+  ipcMain.handle(IPC.RANKED_HISTORY, (_event, queueType?: string) => {
+    return getRankedHistory(queueType as import('../../shared/types').RankedQueueType | undefined)
   })
 
   // Changement de rôle (depuis la page Draft)

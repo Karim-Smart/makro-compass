@@ -14,6 +14,8 @@ import { generateMacroTip, trackObjectiveKill, resetMacroEngine } from './macroT
 import { detectAlerts, resetAlertEngine } from './alertEngine'
 import { generateBuildRecommendations } from './buildEngine'
 import { generateRunePages } from '../../shared/rune-data'
+import { getLastQueueType, detectCurrentQueueType } from './lcuAgent'
+import { saveRankedGame } from './quotaManager'
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -63,6 +65,10 @@ const ERRORS_BEFORE_END = 3
 // Throttle : ne pas broadcasté la même donnée à chaque poll
 let lastBroadcastedTip = ''
 let lastBroadcastedBuildKey = ''
+
+// Résultat de fin de partie (détecté via GameEnd event)
+let lastGameResult: 'win' | 'loss' | null = null
+let lastGameData: GameData | null = null
 
 // ─── Parsing enrichi ─────────────────────────────────────────────────────────
 
@@ -236,6 +242,10 @@ function processNewEvents(events: RiotApiResponse['events'], gameData: GameData)
         registerObjectiveKill('herald', gameData.gameTime)
         trackObjectiveKill('herald', eventTime)
         break
+      case 'GameEnd':
+        lastGameResult = event.Result === 'Win' ? 'win' : 'loss'
+        console.log(`[RiotAgent] GameEnd détecté — résultat: ${lastGameResult}`)
+        break
     }
   }
 }
@@ -278,12 +288,18 @@ async function poll(): Promise<void> {
       const runePages = generateRunePages(gameData.champion, style)
       broadcastToWindows(IPC.OVERLAY_RUNES, runePages)
 
+      // Détecter le type de queue (ranked ?) via LCU
+      detectCurrentQueueType()
+
       console.log(`[RiotAgent] Partie détectée — ${gameData.champion} (${gameData.gameMode})`)
     }
 
     processNewEvents(raw.events, gameData)
     updateGameData(gameData)
     broadcastToWindows(IPC.GAME_DATA, gameData)
+
+    // Garder les dernières gameData pour sauvegarde ranked en fin de partie
+    lastGameData = gameData
 
     // Stocker les dernières gameData pour le refresh build
     ;(global as typeof global & { __lastGameData?: GameData }).__lastGameData = gameData
@@ -342,11 +358,21 @@ async function poll(): Promise<void> {
     consecutiveErrors++
 
     if (wasInGame && consecutiveErrors >= ERRORS_BEFORE_END) {
+      // Sauvegarder la partie ranked si applicable
+      const queueType = getLastQueueType()
+      if (queueType && lastGameData) {
+        const result = lastGameResult ?? (lastGameData.teamKills > lastGameData.enemyKills ? 'win' : 'loss')
+        saveRankedGame(lastGameData, queueType, result)
+        console.log(`[RiotAgent] Partie classée sauvegardée — ${lastGameData.champion} ${result} (${queueType})`)
+      }
+
       wasInGame = false
       lastProcessedEventId = -1
       consecutiveErrors = 0
       lastBroadcastedTip = ''
       lastBroadcastedBuildKey = ''
+      lastGameResult = null
+      lastGameData = null
       const status: GameStatus = { isInGame: false }
       broadcastToWindows(IPC.GAME_STATUS, status)
       hideOverlay()
@@ -436,6 +462,7 @@ interface RiotApiResponse {
       KillerName?: string
       TurretKilled?: string
       DragonType?: string    // Fire, Water, Earth, Air, Hextech, Chemtech, Elder
+      Result?: string        // Win ou Lose (GameEnd event)
     }>
   }
 }

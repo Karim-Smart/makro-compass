@@ -2,16 +2,12 @@ import { useEffect, useState } from 'react'
 import { useCoachingStore } from '../stores/coachingStore'
 import { COACHING_STYLES } from '../../../shared/constants'
 import { IPC } from '../../../shared/ipc-channels'
+import { getChampionIconUrl } from '../../../shared/champion-images'
+import type { RankedGame, RankedQueueType } from '../../../shared/types'
 
-interface StoredAdvice {
-  timestamp: number
-  style: string
-  gameTime: number
-  priority: string
-  text: string
-}
+type QueueTab = 'RANKED_SOLO' | 'RANKED_FLEX'
 
-function fmtTime(s: number): string {
+function fmtGameTime(s: number): string {
   const m = Math.floor(s / 60)
   const ss = s % 60
   return `${m}:${ss.toString().padStart(2, '0')}`
@@ -23,39 +19,36 @@ function fmtDate(ts: number): string {
     + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 }
 
-const PRIORITY_CFG = {
-  high:   { color: '#ef4444', label: 'Urgent', bg: '#ef444418', dot: '⚡' },
-  medium: { color: '#f59e0b', label: 'Moyen',  bg: '#f59e0b18', dot: '●' },
-  low:    { color: '#6b7280', label: 'Info',   bg: '#6b728018', dot: '○' },
-} as const
-
-type Priority = keyof typeof PRIORITY_CFG
-type Filter = 'all' | Priority
-
-const FILTERS: { id: Filter; label: string }[] = [
-  { id: 'all',    label: 'Tous'     },
-  { id: 'high',   label: '⚡ Urgent' },
-  { id: 'medium', label: '● Moyen'  },
-  { id: 'low',    label: '○ Info'   },
-]
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts
+  const mins = Math.floor(diff / 60_000)
+  if (mins < 60) return `il y a ${mins} min`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `il y a ${hours}h`
+  const days = Math.floor(hours / 24)
+  return `il y a ${days}j`
+}
 
 export default function Stats() {
   const { selectedStyle } = useCoachingStore()
   const style = COACHING_STYLES[selectedStyle]
   const c = style.colors
 
-  const [history, setHistory] = useState<StoredAdvice[]>([])
+  const [games, setGames] = useState<RankedGame[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<Filter>('all')
+  const [tab, setTab] = useState<QueueTab>('RANKED_SOLO')
 
   useEffect(() => {
-    window.electronAPI.invoke(IPC.ADVICE_HISTORY)
-      .then((data) => setHistory((data as StoredAdvice[]) ?? []))
-      .catch(() => setHistory([]))
+    setLoading(true)
+    window.electronAPI.invoke(IPC.RANKED_HISTORY, tab)
+      .then((data) => setGames((data as RankedGame[]) ?? []))
+      .catch(() => setGames([]))
       .finally(() => setLoading(false))
-  }, [])
+  }, [tab])
 
-  const filtered = filter === 'all' ? history : history.filter((a) => a.priority === filter)
+  const wins = games.filter((g) => g.result === 'win').length
+  const losses = games.filter((g) => g.result === 'loss').length
+  const winrate = games.length > 0 ? Math.round((wins / games.length) * 100) : 0
 
   return (
     <div className="flex flex-col h-full">
@@ -64,22 +57,37 @@ export default function Stats() {
       <div className="px-5 pt-5 pb-0 flex-shrink-0">
         <div className="flex items-end justify-between mb-4">
           <div>
-            <h1 className="text-base font-black text-white tracking-tight">Historique</h1>
+            <h1 className="text-base font-black text-white tracking-tight">Parties classées</h1>
             <p className="text-[10px] mt-0.5" style={{ color: c.text, opacity: 0.3 }}>
-              {history.length} conseil{history.length !== 1 ? 's' : ''} au total
+              {games.length} partie{games.length !== 1 ? 's' : ''}
+              {games.length > 0 && (
+                <span>
+                  {' — '}
+                  <span style={{ color: '#22c55e' }}>{wins}W</span>
+                  {' / '}
+                  <span style={{ color: '#ef4444' }}>{losses}L</span>
+                  {' '}
+                  <span style={{ color: winrate >= 50 ? '#22c55e' : '#ef4444' }}>
+                    ({winrate}%)
+                  </span>
+                </span>
+              )}
             </p>
           </div>
         </div>
 
-        {/* Filter pills */}
-        <div className="flex gap-1.5 flex-wrap pb-4">
-          {FILTERS.map(({ id, label }) => {
-            const active = filter === id
+        {/* Sub-tabs Solo/Duo — Flex */}
+        <div className="flex gap-2 pb-4">
+          {([
+            { id: 'RANKED_SOLO' as QueueTab, label: 'Solo / Duo' },
+            { id: 'RANKED_FLEX' as QueueTab, label: 'Flex' },
+          ]).map(({ id, label }) => {
+            const active = tab === id
             return (
               <button
                 key={id}
-                onClick={() => setFilter(id)}
-                className="px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-150"
+                onClick={() => setTab(id)}
+                className="px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-150"
                 style={active ? {
                   backgroundColor: c.accent,
                   color: c.bg,
@@ -94,31 +102,26 @@ export default function Stats() {
               </button>
             )
           })}
-          {filter !== 'all' && (
-            <span className="ml-1 text-[10px] self-center" style={{ color: c.text, opacity: 0.3 }}>
-              {filtered.length} résultat{filtered.length !== 1 ? 's' : ''}
-            </span>
-          )}
         </div>
 
         {/* Séparateur */}
         <div className="h-px -mx-5" style={{ backgroundColor: c.border }} />
       </div>
 
-      {/* ─── Liste ─── */}
+      {/* ─── Liste des parties ─── */}
       <div className="flex-1 overflow-auto px-5 py-4">
         {loading ? (
           <div className="space-y-3">
             {Array.from({ length: 4 }).map((_, i) => (
               <div
                 key={i}
-                className="rounded-xl h-[72px] animate-pulse"
+                className="rounded-xl h-[100px] animate-pulse"
                 style={{ backgroundColor: c.border, opacity: 0.4 }}
               />
             ))}
           </div>
 
-        ) : filtered.length === 0 ? (
+        ) : games.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-center select-none">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" strokeWidth={1.5} className="w-10 h-10 mb-3"
@@ -126,56 +129,146 @@ export default function Stats() {
               <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <p className="font-semibold text-sm" style={{ color: c.text, opacity: 0.3 }}>
-              {filter !== 'all' ? 'Aucun conseil dans cette catégorie' : 'Aucun conseil enregistré'}
+              Aucune partie {tab === 'RANKED_SOLO' ? 'Solo/Duo' : 'Flex'} enregistrée
             </p>
-            {filter === 'all' && (
-              <p className="text-xs mt-1" style={{ color: c.text, opacity: 0.2 }}>
-                Lance une partie pour voir l'historique ici.
-              </p>
-            )}
+            <p className="text-xs mt-1" style={{ color: c.text, opacity: 0.2 }}>
+              Les parties classées seront sauvegardées automatiquement.
+            </p>
           </div>
 
         ) : (
-          <div className="space-y-2">
-            {filtered.map((advice, idx) => {
-              const pConf = PRIORITY_CFG[advice.priority as Priority] ?? PRIORITY_CFG.medium
+          <div className="space-y-2.5">
+            {games.map((game) => {
+              const isWin = game.result === 'win'
+              const kda = game.deaths === 0
+                ? (game.kills + game.assists).toFixed(1)
+                : ((game.kills + game.assists) / game.deaths).toFixed(1)
+              const csPerMin = game.gameTime > 0
+                ? (game.cs / (game.gameTime / 60)).toFixed(1)
+                : '0'
+              const kp = game.teamKills > 0
+                ? Math.round(((game.kills + game.assists) / game.teamKills) * 100)
+                : 0
+
               return (
                 <div
-                  key={idx}
-                  className="rounded-xl p-4 relative"
+                  key={game.id}
+                  className="rounded-xl p-3.5 relative overflow-hidden"
                   style={{
                     background: `linear-gradient(135deg, ${c.bg} 0%, ${c.border}30 100%)`,
                     border: `1px solid ${c.border}`,
-                    borderLeftColor: pConf.color + 'A0',
-                    borderLeftWidth: 3,
+                    borderLeftWidth: 4,
+                    borderLeftColor: isWin ? '#22c55e' : '#ef4444',
                   }}
                 >
-                  {/* Meta */}
-                  <div className="flex items-center gap-2 mb-2 flex-wrap">
-                    <span
-                      className="text-[9px] font-black px-1.5 py-0.5 rounded tracking-widest"
-                      style={{ backgroundColor: `${c.accent}20`, color: c.accent }}
-                    >
-                      {advice.style}
-                    </span>
-                    <span
-                      className="text-[9px] font-bold px-1.5 py-0.5 rounded"
-                      style={{ backgroundColor: pConf.bg, color: pConf.color }}
-                    >
-                      {pConf.dot} {pConf.label.toUpperCase()}
-                    </span>
-                    <span className="text-[9px] font-mono" style={{ color: c.text, opacity: 0.3 }}>
-                      {fmtTime(advice.gameTime)} de jeu
-                    </span>
-                    <span className="text-[9px] font-mono ml-auto" style={{ color: c.text, opacity: 0.22 }}>
-                      {fmtDate(advice.timestamp)}
-                    </span>
+                  {/* Ligne 1 : Champion + Résultat + KDA + Meta */}
+                  <div className="flex items-center gap-3">
+                    {/* Champion icon */}
+                    <div className="relative flex-shrink-0">
+                      <img
+                        src={getChampionIconUrl(game.champion)}
+                        alt={game.champion}
+                        className="w-10 h-10 rounded-lg"
+                        style={{ border: `2px solid ${isWin ? '#22c55e' : '#ef4444'}40` }}
+                      />
+                      <span
+                        className="absolute -bottom-1 -right-1 text-[8px] font-black px-1 rounded"
+                        style={{
+                          backgroundColor: isWin ? '#22c55e' : '#ef4444',
+                          color: '#fff',
+                        }}
+                      >
+                        {isWin ? 'W' : 'L'}
+                      </span>
+                    </div>
+
+                    {/* Champion name + level */}
+                    <div className="min-w-0 flex-shrink-0" style={{ width: 80 }}>
+                      <p className="text-xs font-bold text-white truncate">{game.champion}</p>
+                      <p className="text-[9px]" style={{ color: c.text, opacity: 0.4 }}>
+                        Niv. {game.level}
+                      </p>
+                    </div>
+
+                    {/* KDA */}
+                    <div className="text-center flex-shrink-0" style={{ width: 70 }}>
+                      <p className="text-xs font-bold text-white">
+                        <span style={{ color: '#22c55e' }}>{game.kills}</span>
+                        <span style={{ color: c.text, opacity: 0.3 }}> / </span>
+                        <span style={{ color: '#ef4444' }}>{game.deaths}</span>
+                        <span style={{ color: c.text, opacity: 0.3 }}> / </span>
+                        <span style={{ color: '#60a5fa' }}>{game.assists}</span>
+                      </p>
+                      <p className="text-[9px] font-mono" style={{ color: c.text, opacity: 0.4 }}>
+                        {kda} KDA
+                      </p>
+                    </div>
+
+                    {/* Stats compactes */}
+                    <div className="flex gap-3 text-[9px] flex-shrink-0" style={{ color: c.text, opacity: 0.5 }}>
+                      <div className="text-center">
+                        <p className="font-bold text-white text-opacity-80">{game.cs}</p>
+                        <p>{csPerMin}/m</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="font-bold text-white text-opacity-80">{kp}%</p>
+                        <p>KP</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="font-bold text-white text-opacity-80">{game.wardScore}</p>
+                        <p>Vision</p>
+                      </div>
+                    </div>
+
+                    {/* Time + date */}
+                    <div className="ml-auto text-right flex-shrink-0">
+                      <p className="text-[9px] font-mono" style={{ color: c.text, opacity: 0.3 }}>
+                        {fmtGameTime(game.gameTime)}
+                      </p>
+                      <p className="text-[8px]" style={{ color: c.text, opacity: 0.2 }}>
+                        {timeAgo(game.timestamp)}
+                      </p>
+                    </div>
                   </div>
 
-                  {/* Texte */}
-                  <p className="text-xs leading-relaxed" style={{ color: c.text, opacity: 0.85 }}>
-                    {advice.text}
-                  </p>
+                  {/* Ligne 2 : Roast / Tacle */}
+                  <div
+                    className="mt-2.5 pt-2 text-[10px] italic leading-relaxed"
+                    style={{
+                      color: isWin ? '#86efac' : '#fca5a5',
+                      borderTop: `1px solid ${c.border}50`,
+                      opacity: 0.85,
+                    }}
+                  >
+                    "{game.roast}"
+                  </div>
+
+                  {/* Ligne 3 : Equipes compactes */}
+                  <div
+                    className="mt-2 flex items-center gap-1 flex-wrap"
+                    style={{ opacity: 0.4 }}
+                  >
+                    <span className="text-[8px] font-bold" style={{ color: '#22c55e' }}>Allies:</span>
+                    {game.allies.map((a, i) => (
+                      <img
+                        key={i}
+                        src={getChampionIconUrl(a)}
+                        alt={a}
+                        title={a}
+                        className="w-4 h-4 rounded-sm"
+                      />
+                    ))}
+                    <span className="text-[8px] font-bold ml-2" style={{ color: '#ef4444' }}>vs</span>
+                    {game.enemies.map((e, i) => (
+                      <img
+                        key={i}
+                        src={getChampionIconUrl(e)}
+                        alt={e}
+                        title={e}
+                        className="w-4 h-4 rounded-sm"
+                      />
+                    ))}
+                  </div>
                 </div>
               )
             })}

@@ -35,11 +35,11 @@ export function getChampionSplashUrl(name: string): string {
 export function getChampionIconUrl(name: string): string {
   if (!name) return ''
   const key = toDataDragonKey(name)
-  return `https://ddragon.leagueoflegends.com/cdn/14.24.1/img/champion/${key}.png`
+  return `https://ddragon.leagueoflegends.com/cdn/16.4.1/img/champion/${key}.png`
 }
 
 /** Icône d'item via Data Dragon CDN */
 export function getItemIconUrl(itemId: number): string {
   if (!itemId) return ''
-  return `https://ddragon.leagueoflegends.com/cdn/14.24.1/img/item/${itemId}.png`
+  return `https://ddragon.leagueoflegends.com/cdn/16.4.1/img/item/${itemId}.png`
 }

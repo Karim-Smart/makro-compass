@@ -203,6 +203,32 @@ export interface BuildRecommendations {
   style: CoachingStyle
 }
 
+// ─── Partie classée enregistrée ──────────────────────────────────────────────
+
+export type RankedQueueType = 'RANKED_SOLO' | 'RANKED_FLEX'
+
+export interface RankedGame {
+  id: number
+  timestamp: number
+  queueType: RankedQueueType
+  champion: string
+  kills: number
+  deaths: number
+  assists: number
+  cs: number
+  gold: number
+  gameTime: number          // secondes
+  teamKills: number
+  enemyKills: number
+  wardScore: number
+  level: number
+  items: string[]           // JSON parsé
+  allies: string[]          // JSON parsé
+  enemies: string[]         // JSON parsé
+  result: 'win' | 'loss'
+  roast: string             // phrase de tacle/compliment
+}
+
 // Événement IPC générique
 export interface IpcPayload<T> {
   data: T

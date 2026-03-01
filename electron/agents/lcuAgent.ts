@@ -33,6 +33,7 @@ let championMap: Record<number, string> = {}  // id → name
 let wasInChampSelect = false
 let connectionAttempts = 0
 let lastAutoImportChampion = ''
+let lastDetectedQueueId: number | null = null
 
 function detectLcuHost(): string {
   // Si Electron tourne sur Windows (même lancé depuis WSL2), utiliser localhost
@@ -183,6 +184,39 @@ export async function exportRunePageToClient(page: FullRunePage): Promise<boolea
 
 export function isLcuConnected(): boolean {
   return lcuPort !== null && lcuPassword !== null
+}
+
+/**
+ * Retourne le type de queue de la dernière partie détectée.
+ * null si pas ranked, 'RANKED_SOLO' ou 'RANKED_FLEX'.
+ */
+export function getLastQueueType(): import('../../shared/types').RankedQueueType | null {
+  // Queue 420 = Solo/Duo, Queue 440 = Flex
+  if (lastDetectedQueueId === 420) return 'RANKED_SOLO'
+  if (lastDetectedQueueId === 440) return 'RANKED_FLEX'
+  return null
+}
+
+/**
+ * Interroge le LCU pour détecter le type de queue de la partie en cours.
+ */
+export async function detectCurrentQueueType(): Promise<void> {
+  if (!lcuPort || !lcuPassword) return
+
+  try {
+    const resp = await lcuHttpClient.get(
+      getLcuUrl('/lol-gameflow/v1/session'),
+      { headers: getLcuHeaders() },
+    )
+    const data = resp.data as { gameData?: { queue?: { id?: number } } }
+    const queueId = data?.gameData?.queue?.id ?? null
+    lastDetectedQueueId = queueId
+    if (queueId) {
+      console.log(`[LCUAgent] Queue détectée: ${queueId} (${queueId === 420 ? 'Solo/Duo' : queueId === 440 ? 'Flex' : 'Autre'})`)
+    }
+  } catch {
+    // Pas en gameflow, on ignore
+  }
 }
 
 // ─── Polling champion select ────────────────────────────────────────────────

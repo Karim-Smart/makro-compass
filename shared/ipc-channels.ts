@@ -38,7 +38,10 @@ export const IPC = {
   REFRESH_BUILD: 'refresh:build',
 
   // Overlay → Main : contrôle des souris (pour les boutons interactifs)
-  OVERLAY_MOUSE_IGNORE: 'overlay:mouse-ignore'
+  OVERLAY_MOUSE_IGNORE: 'overlay:mouse-ignore',
+
+  // Renderer → Main : historique parties classées (invoke)
+  RANKED_HISTORY: 'ranked:history'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

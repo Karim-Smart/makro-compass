@@ -4,12 +4,11 @@ import { is } from '@electron-toolkit/utils'
 
 let mainWindow: BrowserWindow | null = null
 
-// 6 fenêtres overlay indépendantes (opaques, draggables)
+// 5 fenêtres overlay indépendantes (opaques, draggables)
 let statsWindow: BrowserWindow | null = null
 let timersWindow: BrowserWindow | null = null
 let adviceWindow: BrowserWindow | null = null
 let styleWindow: BrowserWindow | null = null
-let runesWindow: BrowserWindow | null = null
 let buildWindow: BrowserWindow | null = null
 
 const PRELOAD_MAIN = join(__dirname, '../preload/index.cjs')
@@ -158,16 +157,6 @@ export function createOverlayWindows(): BrowserWindow[] {
   })
   styleWindow.on('closed', () => { styleWindow = null })
 
-  // Runes — bas-droite (grande fenêtre pour l'arbre complet)
-  runesWindow = createPanelWindow({
-    panel: 'runes',
-    width: 320,
-    height: 520,
-    x: sw - 340,
-    y: sh - 540,
-  })
-  runesWindow.on('closed', () => { runesWindow = null })
-
   // Build — droite, colonne compacte verticale
   buildWindow = createPanelWindow({
     panel: 'build',
@@ -178,7 +167,7 @@ export function createOverlayWindows(): BrowserWindow[] {
   })
   buildWindow.on('closed', () => { buildWindow = null })
 
-  return [statsWindow, timersWindow, adviceWindow, styleWindow, runesWindow, buildWindow]
+  return [statsWindow, timersWindow, adviceWindow, styleWindow, buildWindow]
 }
 
 // ─── Accesseurs ───────────────────────────────────────────────────────────────
@@ -188,7 +177,7 @@ export function getMainWindow(): BrowserWindow | null {
 }
 
 export function getOverlayWindows(): BrowserWindow[] {
-  return [statsWindow, timersWindow, adviceWindow, styleWindow, runesWindow, buildWindow].filter(
+  return [statsWindow, timersWindow, adviceWindow, styleWindow, buildWindow].filter(
     (w): w is BrowserWindow => w !== null && !w.isDestroyed()
   )
 }

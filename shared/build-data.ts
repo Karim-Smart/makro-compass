@@ -27,7 +27,7 @@ export const CLASS_BUILDS: Record<ChampionClass, ClassBuild> = {
     coreItems: [
       { name: 'Youmuu\'s Ghostblade', itemId: 3142 },
       { name: 'Edge of Night', itemId: 3814 },
-      { name: 'Opportunity', itemId: 7001 },
+      { name: 'Opportunity', itemId: 6701 },
     ],
     boots: { name: 'Ionian Boots of Lucidity', itemId: 3158 },
     situationalAP: [{ name: 'Maw of Malmortius', itemId: 3156 }],
@@ -37,7 +37,7 @@ export const CLASS_BUILDS: Record<ChampionClass, ClassBuild> = {
   },
   mage: {
     coreItems: [
-      { name: 'Luden\'s Companion', itemId: 7013 },
+      { name: 'Luden\'s Echo', itemId: 6655 },
       { name: 'Shadowflame', itemId: 4645 },
       { name: 'Rabadon\'s Deathcap', itemId: 3089 },
     ],

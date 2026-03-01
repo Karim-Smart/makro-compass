@@ -4,6 +4,7 @@ import { ROLE_POOL, CHAMPION_RUNES, CHAMPION_COUNTERS, CHAMPION_SYNERGIES, getSy
 import type { MatchupAnalysis } from '../../../shared/draft-data'
 import { CHAMPIONS, getChampion } from '../../../shared/champion-data'
 import { getChampionLoadingUrl } from '../../../shared/champion-images'
+import { getMatchupWinrate } from '../../../shared/matchup-winrates'
 import type { PlayerRole, ChampionRecommendation } from '../../../shared/types'
 
 const ROLES: { key: PlayerRole; label: string; icon: string }[] = [
@@ -186,8 +187,16 @@ export default function Draft() {
         </div>
       </div>
 
+      {/* Lane Matchups — Winrates par lane */}
+      <LaneMatchups
+        allyPicks={allyPicks}
+        enemyPicks={enemyPicks}
+        enemyRoleMap={enemyRoleMap}
+      />
+
       {/* Drop Zone — Matchup mechanics */}
       <MatchupDropZone
+        myChampion={myChamp}
         champion={inspected}
         matchup={matchup}
         onDrop={handleInspectDrop}
@@ -659,6 +668,54 @@ function ChampionHoverTooltip({
           </div>
         )}
 
+        {/* Winrate matchups */}
+        {side === 'enemy' && filledAllies.length > 0 && (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[9px] font-bold text-gray-400">WINRATE</span>
+            {filledAllies.map((ally) => {
+              const wr = getMatchupWinrate(ally, champion)
+              const wins = wr >= 50
+              return (
+                <div key={ally} className="flex items-center gap-1">
+                  <span className="text-[9px] text-gray-300 w-16 truncate">{ally}</span>
+                  <span className="text-[9px] font-black font-mono" style={{ color: wins ? '#22c55e' : '#ef4444' }}>
+                    {wr}%
+                  </span>
+                  <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ backgroundColor: '#ef444420', maxWidth: 60 }}>
+                    <div className="h-full rounded-full" style={{ width: `${wr}%`, backgroundColor: wins ? '#22c55e' : '#ef4444' }} />
+                  </div>
+                  <span className="text-[9px] font-black font-mono" style={{ color: !wins ? '#22c55e' : '#ef4444' }}>
+                    {100 - wr}%
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+        {side === 'ally' && filledEnemies.length > 0 && (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[9px] font-bold text-gray-400">WINRATE VS</span>
+            {filledEnemies.map((enemy) => {
+              const wr = getMatchupWinrate(champion, enemy)
+              const wins = wr >= 50
+              return (
+                <div key={enemy} className="flex items-center gap-1">
+                  <span className="text-[9px] text-gray-300 w-16 truncate">{enemy}</span>
+                  <span className="text-[9px] font-black font-mono" style={{ color: wins ? '#22c55e' : '#ef4444' }}>
+                    {wr}%
+                  </span>
+                  <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ backgroundColor: '#ef444420', maxWidth: 60 }}>
+                    <div className="h-full rounded-full" style={{ width: `${wr}%`, backgroundColor: wins ? '#22c55e' : '#ef4444' }} />
+                  </div>
+                  <span className="text-[9px] font-black font-mono" style={{ color: !wins ? '#22c55e' : '#ef4444' }}>
+                    {100 - wr}%
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
         {/* Runes */}
         {runes && (
           <div className="flex flex-wrap gap-1 items-center">
@@ -692,14 +749,119 @@ function ChampionHoverTooltip({
   )
 }
 
+// ─── Lane Matchups — Winrates par lane ──────────────────────────────────────
+
+function LaneMatchups({
+  allyPicks, enemyPicks, enemyRoleMap,
+}: {
+  allyPicks: string[]; enemyPicks: string[]; enemyRoleMap: number[]
+}) {
+  const lanes = ROLES.map((r, roleIdx) => {
+    const ally = allyPicks[roleIdx] ?? ''
+    const enemyPickIdx = enemyRoleMap[roleIdx]
+    const enemy = enemyPickIdx >= 0 ? enemyPicks[enemyPickIdx] : ''
+    if (!ally || !enemy) return null
+    const winrate = getMatchupWinrate(ally, enemy)
+    const enemyWinrate = 100 - winrate
+    return { role: r, ally, enemy, winrate, enemyWinrate }
+  }).filter(Boolean) as Array<{
+    role: typeof ROLES[number]; ally: string; enemy: string; winrate: number; enemyWinrate: number
+  }>
+
+  if (lanes.length === 0) return null
+
+  return (
+    <div>
+      <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-2 block">
+        Matchups par lane
+      </span>
+      <div className="flex flex-col gap-1.5">
+        {lanes.map(({ role, ally, enemy, winrate, enemyWinrate }) => {
+          const allyWins = winrate >= 50
+          const allyImgUrl = getChampionLoadingUrl(ally)
+          const enemyImgUrl = getChampionLoadingUrl(enemy)
+
+          return (
+            <div
+              key={role.key}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg"
+              style={{ backgroundColor: '#ffffff06', border: '1px solid #ffffff08' }}
+            >
+              {/* Role */}
+              <span className="text-[9px] font-bold uppercase text-gray-500 w-10 text-center flex-shrink-0">
+                {role.icon} {role.label}
+              </span>
+
+              {/* Ally */}
+              <div className="flex items-center gap-1.5 w-24 flex-shrink-0">
+                <img
+                  src={allyImgUrl}
+                  alt={ally}
+                  className="w-6 h-6 rounded-full object-cover object-top flex-shrink-0"
+                  style={{ border: '1.5px solid #22c55e50' }}
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                />
+                <span className="text-[10px] font-bold text-white truncate">{ally}</span>
+              </div>
+
+              {/* Winrate bar */}
+              <div className="flex-1 flex items-center gap-1.5 min-w-0">
+                <span
+                  className="text-xs font-black font-mono w-9 text-right flex-shrink-0"
+                  style={{ color: allyWins ? '#22c55e' : '#ef4444' }}
+                >
+                  {winrate}%
+                </span>
+                <div
+                  className="flex-1 h-2 rounded-full overflow-hidden"
+                  style={{ backgroundColor: '#ef444425' }}
+                >
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${winrate}%`,
+                      backgroundColor: allyWins ? '#22c55e' : '#ef4444',
+                      opacity: 0.8,
+                    }}
+                  />
+                </div>
+                <span
+                  className="text-xs font-black font-mono w-9 flex-shrink-0"
+                  style={{ color: !allyWins ? '#22c55e' : '#ef4444' }}
+                >
+                  {enemyWinrate}%
+                </span>
+              </div>
+
+              {/* Enemy */}
+              <div className="flex items-center gap-1.5 w-24 flex-shrink-0 justify-end">
+                <span className="text-[10px] font-bold text-white truncate">{enemy}</span>
+                <img
+                  src={enemyImgUrl}
+                  alt={enemy}
+                  className="w-6 h-6 rounded-full object-cover object-top flex-shrink-0"
+                  style={{ border: '1.5px solid #ef444450' }}
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ─── Drop Zone — Matchup Mechanics ──────────────────────────────────────────
 
 function MatchupDropZone({
+  myChampion,
   champion,
   matchup,
   onDrop,
   onClear,
 }: {
+  myChampion: string
   champion: string | null
   matchup: MatchupAnalysis | null
   onDrop: (name: string) => void
@@ -785,12 +947,30 @@ function MatchupDropZone({
               ✕
             </button>
           </div>
-          <span
-            className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full inline-block mt-1"
-            style={{ backgroundColor: adv.bg, color: adv.text, border: `1px solid ${adv.border}` }}
-          >
-            {adv.label}
-          </span>
+          <div className="flex items-center gap-2 mt-1">
+            <span
+              className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full inline-block"
+              style={{ backgroundColor: adv.bg, color: adv.text, border: `1px solid ${adv.border}` }}
+            >
+              {adv.label}
+            </span>
+            {myChampion && champion && (() => {
+              const wr = getMatchupWinrate(myChampion, champion)
+              const enemyWr = 100 - wr
+              const wins = wr >= 50
+              return (
+                <span className="flex items-center gap-1">
+                  <span className="text-[10px] font-black font-mono" style={{ color: wins ? '#22c55e' : '#ef4444' }}>
+                    {wr}%
+                  </span>
+                  <span className="text-[8px] text-gray-600">vs</span>
+                  <span className="text-[10px] font-black font-mono" style={{ color: !wins ? '#22c55e' : '#ef4444' }}>
+                    {enemyWr}%
+                  </span>
+                </span>
+              )
+            })()}
+          </div>
         </div>
       </div>
 
