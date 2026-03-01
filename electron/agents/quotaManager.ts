@@ -90,6 +90,13 @@ function getDb(): Database.Database {
     WHERE game_id IS NOT NULL
   `)
 
+  // Migration : ajouter role pour tracking du rôle joué
+  try {
+    db.exec(`ALTER TABLE ranked_games ADD COLUMN role TEXT`)
+  } catch {
+    // Colonne déjà présente, on ignore
+  }
+
   // Insérer la ligne de quota si elle n'existe pas
   const tomorrow = Date.now() + 86_400_000
   db.prepare(`
@@ -259,6 +266,13 @@ export function saveRankedGame(
       gameData.wardScore,
     )
 
+    // Déduire le rôle joué depuis la position du matchup
+    const posMap: Record<string, string> = {
+      TOP: 'TOP', JUNGLE: 'JUNGLE', MIDDLE: 'MID', MID: 'MID',
+      BOTTOM: 'ADC', ADC: 'ADC', UTILITY: 'SUPPORT', SUPPORT: 'SUPPORT',
+    }
+    const role = gameData.matchup?.position ? posMap[gameData.matchup.position] ?? null : null
+
     // Pseudo game_id déterministe pour éviter les doublons si LCU importe aussi la même partie
     const pseudoGameId = `live_${gameData.champion}_${Math.floor(gameData.gameTime)}_${gameData.kda.kills}${gameData.kda.deaths}${gameData.kda.assists}_${gameData.cs}`
 
@@ -266,8 +280,8 @@ export function saveRankedGame(
       INSERT OR IGNORE INTO ranked_games (
         game_id, timestamp, queue_type, champion, kills, deaths, assists,
         cs, gold, game_time, team_kills, enemy_kills,
-        ward_score, level, items, allies, enemies, result, roast
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ward_score, level, items, allies, enemies, result, roast, role
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       pseudoGameId,
       Date.now(),
@@ -288,6 +302,7 @@ export function saveRankedGame(
       JSON.stringify(gameData.enemies),
       result,
       roast,
+      role,
     )
 
     console.log(`[QuotaManager] Partie classée sauvegardée — ${gameData.champion} ${result} (${queueType})`)
@@ -320,6 +335,7 @@ export function saveRankedGameDirect(data: {
   allies: string[]
   enemies: string[]
   result: 'win' | 'loss'
+  role?: string
 }): boolean {
   try {
     const roast = generateRoast(
@@ -331,8 +347,8 @@ export function saveRankedGameDirect(data: {
       INSERT OR IGNORE INTO ranked_games (
         game_id, timestamp, queue_type, champion, kills, deaths, assists,
         cs, gold, game_time, team_kills, enemy_kills,
-        ward_score, level, items, allies, enemies, result, roast
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ward_score, level, items, allies, enemies, result, roast, role
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
 
     const res = stmt.run(
@@ -349,6 +365,7 @@ export function saveRankedGameDirect(data: {
       JSON.stringify(data.enemies),
       data.result,
       roast,
+      data.role ?? null,
     )
 
     if (res.changes > 0) {
@@ -400,6 +417,7 @@ export function getRankedHistory(queueType?: RankedQueueType): RankedGame[] {
       allies: JSON.parse(row.allies as string) as string[],
       enemies: JSON.parse(row.enemies as string) as string[],
       result: row.result as 'win' | 'loss',
+      role: (row.role as string) || undefined,
       roast: row.roast as string,
     }))
   } catch (err) {

@@ -38,14 +38,19 @@ const categoryCooldowns: Record<string, number> = {}
 
 // Durées des cooldowns par catégorie (secondes de gameTime)
 const CATEGORY_CD: Record<string, number> = {
-  'cs':          120,   // CS feedback max 1 fois / 2 min
-  'ally':         90,   // ally tip max 1 fois / 1.5 min
-  'class-rule':   60,   // class matchup max 1 fois / 1 min
-  'phase':        45,   // tips de phase max 1 fois / 45s
-  'comp':         90,   // enemy comp max 1 fois / 1.5 min
-  'power-curve':  90,   // power curve max 1 fois / 1.5 min
-  'gold-diff':   120,   // gold diff max 1 fois / 2 min
-  'structural':  180,   // avance structurelle max 1 fois / 3 min
+  'cs':              120,   // CS feedback max 1 fois / 2 min
+  'ally':             90,   // ally tip max 1 fois / 1.5 min
+  'class-rule':       60,   // class matchup max 1 fois / 1 min
+  'phase':            45,   // tips de phase max 1 fois / 45s
+  'comp':             90,   // enemy comp max 1 fois / 1.5 min
+  'power-curve':      90,   // power curve max 1 fois / 1.5 min
+  'gold-diff':       120,   // gold diff max 1 fois / 2 min
+  'structural':      180,   // avance structurelle max 1 fois / 3 min
+  'back-timing':     120,   // back timing max 1 fois / 2 min
+  'bounty':          180,   // bounty awareness max 1 fois / 3 min
+  'death-analysis':  180,   // death analysis max 1 fois / 3 min
+  'kp':              180,   // kill participation max 1 fois / 3 min
+  'vision':          180,   // vision reminder max 1 fois / 3 min
 }
 
 // ─── Helpers anti-répétition ──────────────────────────────────────────────
@@ -471,15 +476,78 @@ export function generateMacroTip(
     tips.push({ text: `⚔️ ${completedItems} items — ${styleTips.itemSpike}`, priority: 'low', weight: 33, category: 'item-spike' })
   }
 
-  // ─── CS FEEDBACK (weight 20-25) ────────────────────────────────────
+  // ─── BACK TIMING (weight 30-35) ────────────────────────────────────
+
+  const goldForItem = gameData.gold
+  if (goldForItem >= 1250 && goldForItem < 1350 && completedItems === 0 && gameTime < 900) {
+    tips.push({ text: `💰 ${goldForItem}g — assez pour un composant clé, cherche un back timing`, priority: 'low', weight: 32, category: 'back-timing' })
+  } else if (goldForItem >= 3000 && completedItems <= 1 && gameTime < 1200) {
+    tips.push({ text: `💰 ${goldForItem}g en poche — back MAINTENANT pour spike d'item`, priority: 'medium', weight: 35, category: 'back-timing' })
+  }
+
+  // ─── BOUNTY AWARENESS (weight 40-48) ─────────────────────────────
+
+  const myKills = gameData.kda.kills
+  const myDeaths = gameData.kda.deaths
+  if (myKills >= 3 && myDeaths === 0) {
+    const bountyGold = 150 + (myKills - 2) * 100  // approximation
+    tips.push({ text: `⚠️ Tu as une bounty ~${bountyGold}g — ne prends pas de risques inutiles`, priority: 'medium', weight: 44, category: 'bounty' })
+  }
+  if (matchup && matchup.oppKda.kills >= 4 && matchup.oppKda.deaths <= 1) {
+    tips.push({ text: `💰 ${matchup.champion} a une grosse bounty — un shutdown = retour dans la game`, priority: 'medium', weight: 46, category: 'bounty' })
+  }
+
+  // ─── DEATH ANALYSIS (weight 32-45) ───────────────────────────────
+
+  if (myDeaths >= 3 && gameTime < 900) {
+    tips.push({ text: `💀 ${myDeaths} morts avant 15 min — joue plus safe, farm sous tour, attends le mid game`, priority: 'high', weight: 45, category: 'death-analysis' })
+  } else if (myDeaths >= 5) {
+    tips.push({ text: `💀 ${myDeaths} morts — chaque mort donne 300g+ et du tempo. Joue groupé`, priority: 'medium', weight: 38, category: 'death-analysis' })
+  }
+
+  // ─── KP AWARENESS (weight 20-30) ─────────────────────────────────
+
+  const kp = teamKills > 0 ? ((gameData.kda.kills + gameData.kda.assists) / teamKills) * 100 : 0
+  if (gameTime >= 600 && kp < 30 && teamKills >= 5) {
+    tips.push({ text: `🤝 ${kp.toFixed(0)}% KP — tu n'es pas assez impliqué. Roam ou groupe plus`, priority: 'medium', weight: 28, category: 'kp' })
+  } else if (kp >= 80 && teamKills >= 8) {
+    tips.push({ text: `🤝 ${kp.toFixed(0)}% KP — tu es partout ! Continue d'impacter la map`, priority: 'low', weight: 18, category: 'kp' })
+  }
+
+  // ─── VISION PROACTIVE (weight 25-35) ─────────────────────────────
+
+  const visionPerMin = gameTime > 60 ? gameData.wardScore / (gameTime / 60) : 0
+  if (gameTime >= 600 && visionPerMin < 0.3) {
+    tips.push({ text: `👁 Vision score très bas — achète des wards de contrôle, place-les avant les objectifs`, priority: 'medium', weight: 30, category: 'vision' })
+  }
+
+  // ─── CS FEEDBACK PAR RÔLE (weight 20-30) ───────────────────────────
 
   if (gameTime >= 300 && csPerMin > 0) {
-    if (csPerMin < 4) {
-      tips.push({ text: `📊 ${csPerMin.toFixed(1)} CS/min — c'est très bas, focus les last hits, chaque 15 CS = 1 kill`, priority: 'medium', weight: 25, category: 'cs' })
-    } else if (csPerMin < 6) {
-      tips.push({ text: `📊 ${csPerMin.toFixed(1)} CS/min — essaie d'atteindre 7+, ne rate pas les canons`, priority: 'low', weight: 22, category: 'cs' })
-    } else if (csPerMin >= 9) {
+    const role = matchup?.position ?? ''
+    const isJungle = role === 'JUNGLE'
+    const isSupport = role === 'UTILITY'
+    // Benchmarks réalistes par rôle (Diamond+)
+    const csBench = isJungle ? { bad: 5, ok: 6, good: 7.5 }
+      : isSupport ? { bad: 0.8, ok: 1.5, good: 2.5 }
+      : { bad: 5.5, ok: 7, good: 8.5 }
+
+    if (!isSupport && csPerMin < csBench.bad) {
+      tips.push({ text: `📊 ${csPerMin.toFixed(1)} CS/min — c'est très bas, focus les last hits, chaque 15 CS = 1 kill`, priority: 'medium', weight: 28, category: 'cs' })
+    } else if (!isSupport && csPerMin < csBench.ok) {
+      tips.push({ text: `📊 ${csPerMin.toFixed(1)} CS/min — essaie d'atteindre ${csBench.good}+, ne rate pas les canons`, priority: 'low', weight: 22, category: 'cs' })
+    } else if (csPerMin >= csBench.good * 1.1) {
       tips.push({ text: `📊 ${csPerMin.toFixed(1)} CS/min — excellent farming, garde ce rythme`, priority: 'low', weight: 20, category: 'cs' })
+    }
+
+    // CS diff vs adversaire
+    if (matchup && !isJungle && !isSupport) {
+      const csDiff = cs - matchup.oppCs
+      if (csDiff >= 30) {
+        tips.push({ text: `📈 +${csDiff} CS d'avance sur ${matchup.champion} — ton lead farm paye`, priority: 'low', weight: 18, category: 'cs' })
+      } else if (csDiff <= -30) {
+        tips.push({ text: `📉 -${Math.abs(csDiff)} CS de retard sur ${matchup.champion} — focus CS, chaque vague compte`, priority: 'medium', weight: 26, category: 'cs' })
+      }
     }
   }
 

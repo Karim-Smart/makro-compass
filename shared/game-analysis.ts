@@ -254,5 +254,47 @@ export function computeInsights(games: RankedGame[]): Insight[] {
     })
   }
 
-  return insights.sort((a, b) => b.priority - a.priority).slice(0, 5)
+  // ── Durée moyenne des parties ───────────────────────────────────────────────
+  const avgGameTime = recent.reduce((a, g) => a + g.gameTime, 0) / recent.length
+  const avgMin = Math.floor(avgGameTime / 60)
+  if (avgMin > 32) {
+    insights.push({
+      type: 'tip', icon: '⏱', priority: 3,
+      title: 'Parties longues',
+      description: `Moyenne de ${avgMin} min. Essaie de closer plus tôt — force Baron dès 20 min si tu es ahead.`,
+    })
+  }
+
+  // ── Meilleur rôle ─────────────────────────────────────────────────────────
+  const roleStats: Record<string, { wins: number; total: number }> = {}
+  for (const g of recent) {
+    if (!g.role) continue
+    if (!roleStats[g.role]) roleStats[g.role] = { wins: 0, total: 0 }
+    roleStats[g.role].total++
+    if (g.result === 'win') roleStats[g.role].wins++
+  }
+  const roles = Object.entries(roleStats).filter(([, s]) => s.total >= 3)
+  if (roles.length >= 2) {
+    const best = roles.sort(([, a], [, b]) => (b.wins / b.total) - (a.wins / a.total))[0]
+    const bestWr = Math.round((best[1].wins / best[1].total) * 100)
+    if (bestWr >= 55) {
+      insights.push({
+        type: 'success', icon: '🎮', priority: 2,
+        title: `Ton meilleur rôle : ${best[0]}`,
+        description: `${bestWr}% winrate sur ${best[1].total} parties. Priorise ce rôle en ranked.`,
+      })
+    }
+  }
+
+  // ── Ratio morts par minute ────────────────────────────────────────────────
+  const avgDeathsPerMin = recent.reduce((a, g) => a + (g.gameTime > 0 ? g.deaths / (g.gameTime / 60) : 0), 0) / recent.length
+  if (avgDeathsPerMin > 0.35) {
+    insights.push({
+      type: 'warning', icon: '💀', priority: 6,
+      title: 'Tu meurs trop souvent',
+      description: `${avgDeathsPerMin.toFixed(2)} morts/min en moyenne. Objectif : moins de 0.25. Joue plus prudemment en early.`,
+    })
+  }
+
+  return insights.sort((a, b) => b.priority - a.priority).slice(0, 6)
 }

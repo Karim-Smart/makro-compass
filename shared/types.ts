@@ -274,6 +274,7 @@ export interface RankedGame {
   allies: string[]          // JSON parsé
   enemies: string[]         // JSON parsé
   result: 'win' | 'loss'
+  role?: string             // TOP, JUNGLE, MID, ADC, SUPPORT (optionnel pour anciennes parties)
   roast: string             // phrase de tacle/compliment
 }
 

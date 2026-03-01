@@ -328,6 +328,7 @@ interface LcuMatchParticipant {
   teamId: number
   championId: number
   stats: LcuMatchStats
+  timeline?: { lane?: string; role?: string }
 }
 
 interface LcuMatchIdentity {
@@ -409,6 +410,21 @@ export async function importRecentRankedGames(count = 5): Promise<number> {
         me.stats.item3, me.stats.item4, me.stats.item5, me.stats.item6,
       ].filter((id) => id > 0).map(String)
 
+      // Déduire le rôle joué depuis les données timeline
+      const laneMap: Record<string, string> = {
+        TOP: 'TOP', JUNGLE: 'JUNGLE', MIDDLE: 'MID', MID: 'MID',
+        BOTTOM: 'ADC', BOT: 'ADC',
+      }
+      let detectedRole: string | undefined
+      const rawLane = me.timeline?.lane?.toUpperCase()
+      if (rawLane && laneMap[rawLane]) {
+        detectedRole = laneMap[rawLane]
+        // Corriger BOTTOM → SUPPORT si le rôle LCU indique DUO_SUPPORT
+        if (rawLane === 'BOTTOM' && me.timeline?.role === 'DUO_SUPPORT') {
+          detectedRole = 'SUPPORT'
+        }
+      }
+
       const inserted = saveRankedGameDirect({
         gameId: String(game.gameId),
         timestamp: game.gameCreation,
@@ -420,6 +436,7 @@ export async function importRecentRankedGames(count = 5): Promise<number> {
         cs: me.stats.totalMinionsKilled + me.stats.neutralMinionsKilled,
         gold: me.stats.goldEarned,
         gameTime: game.gameDuration,
+        role: detectedRole,
         teamKills,
         enemyKills,
         wardScore: me.stats.visionScore ?? 0,
