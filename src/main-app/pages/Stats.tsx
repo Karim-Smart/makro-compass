@@ -3,7 +3,9 @@ import { useCoachingStore } from '../stores/coachingStore'
 import { COACHING_STYLES } from '../../../shared/constants'
 import { IPC } from '../../../shared/ipc-channels'
 import { getChampionIconUrl } from '../../../shared/champion-images'
-import type { RankedGame, RankedQueueType, ReviewTimeline, ReviewEvent } from '../../../shared/types'
+import { computeGameGrade, computeRecentForm } from '../../../shared/game-analysis'
+import type { RankedGame, RankedQueueType, ReviewTimeline, ReviewEvent, PostGameDebriefResponse, SmartRecap } from '../../../shared/types'
+import FeatureLock from '../components/FeatureLock'
 
 type QueueTab = 'RANKED_SOLO' | 'RANKED_FLEX'
 
@@ -48,6 +50,12 @@ export default function Stats() {
   const [launchingReplay, setLaunchingReplay] = useState<number | null>(null)
   // Import manuel en cours
   const [importing, setImporting] = useState(false)
+  // AI Debrief : stocke la réponse par gameId
+  const [debriefs, setDebriefs] = useState<Record<number, PostGameDebriefResponse | 'loading'>>({})
+  const [openDebriefId, setOpenDebriefId] = useState<number | null>(null)
+  // AI Smart Recap : headline + grade IA par gameId
+  const [recaps, setRecaps] = useState<Record<number, SmartRecap | 'loading'>>({})
+  const [openRecapId, setOpenRecapId] = useState<number | null>(null)
 
   // Rechargement quand l'onglet change ou quand l'import LCU termine
   useEffect(() => {
@@ -99,6 +107,52 @@ export default function Stats() {
     }
   }
 
+  // AI Debrief IA
+  async function handleDebrief(gameId: number) {
+    if (openDebriefId === gameId) {
+      setOpenDebriefId(null)
+      return
+    }
+    setOpenDebriefId(gameId)
+    if (debriefs[gameId]) return
+    setDebriefs((prev) => ({ ...prev, [gameId]: 'loading' }))
+    try {
+      const result = await window.electronAPI.invoke(IPC.POSTGAME_DEBRIEF, gameId) as PostGameDebriefResponse | null
+      if (result) {
+        setDebriefs((prev) => ({ ...prev, [gameId]: result }))
+      } else {
+        setDebriefs((prev) => { const next = { ...prev }; delete next[gameId]; return next })
+        setOpenDebriefId(null)
+      }
+    } catch {
+      setDebriefs((prev) => { const next = { ...prev }; delete next[gameId]; return next })
+      setOpenDebriefId(null)
+    }
+  }
+
+  // AI Smart Recap
+  async function handleRecap(gameId: number) {
+    if (openRecapId === gameId) {
+      setOpenRecapId(null)
+      return
+    }
+    setOpenRecapId(gameId)
+    if (recaps[gameId]) return
+    setRecaps((prev) => ({ ...prev, [gameId]: 'loading' }))
+    try {
+      const result = await window.electronAPI.invoke(IPC.SMART_RECAP, gameId) as SmartRecap | null
+      if (result) {
+        setRecaps((prev) => ({ ...prev, [gameId]: result }))
+      } else {
+        setRecaps((prev) => { const next = { ...prev }; delete next[gameId]; return next })
+        setOpenRecapId(null)
+      }
+    } catch {
+      setRecaps((prev) => { const next = { ...prev }; delete next[gameId]; return next })
+      setOpenRecapId(null)
+    }
+  }
+
   // Lance le replay via le client LoL
   async function handleLaunchReplay(gameId: number) {
     setLaunchingReplay(gameId)
@@ -109,41 +163,111 @@ export default function Stats() {
   const wins = games.filter((g) => g.result === 'win').length
   const losses = games.filter((g) => g.result === 'loss').length
   const winrate = games.length > 0 ? Math.round((wins / games.length) * 100) : 0
+  const recentForm = computeRecentForm(games, 10).reverse()  // ancien → récent (gauche → droite)
+
+  // Métriques moyennes sur toutes les parties chargées
+  const avgKda = games.length > 0
+    ? (games.reduce((s, g) => s + (g.deaths === 0 ? 5 : (g.kills + g.assists) / g.deaths), 0) / games.length).toFixed(2)
+    : null
+  const avgCs = games.length > 0
+    ? (games.reduce((s, g) => s + (g.gameTime > 0 ? g.cs / (g.gameTime / 60) : 0), 0) / games.length).toFixed(1)
+    : null
+  const avgVision = games.length > 0
+    ? (games.reduce((s, g) => s + (g.gameTime > 0 ? g.wardScore / (g.gameTime / 60) : 0), 0) / games.length).toFixed(1)
+    : null
 
   return (
     <div className="flex flex-col h-full">
 
       {/* ─── Header ─── */}
       <div className="px-5 pt-5 pb-0 flex-shrink-0">
-        <div className="flex items-end justify-between mb-4">
-          <div>
-            <h1 className="text-base font-black text-white tracking-tight">Parties classées</h1>
-            <p className="text-[10px] mt-0.5" style={{ color: c.text, opacity: 0.3 }}>
-              {games.length} partie{games.length !== 1 ? 's' : ''}
-              {games.length > 0 && (
-                <span>
-                  {' — '}
-                  <span style={{ color: '#22c55e' }}>{wins}W</span>
-                  {' / '}
-                  <span style={{ color: '#ef4444' }}>{losses}L</span>
-                  {' '}
-                  <span style={{ color: winrate >= 50 ? '#22c55e' : '#ef4444' }}>
-                    ({winrate}%)
-                  </span>
-                </span>
-              )}
-            </p>
-          </div>
-          <button
-            onClick={handleImport}
-            disabled={importing}
-            className="text-[10px] font-bold px-3 py-1 rounded-full transition-all duration-150 disabled:opacity-40"
-            style={{ backgroundColor: `${c.accent}20`, color: c.accent, border: `1px solid ${c.accent}40` }}
-            title="Importer depuis le client LoL"
-          >
-            {importing ? '...' : 'Actualiser'}
-          </button>
+        <div className="flex items-center justify-between mb-3">
+          <h1 className="text-base font-black text-white tracking-tight">Parties classées</h1>
+          <FeatureLock feature="ranked_import">
+            <button
+              onClick={handleImport}
+              disabled={importing}
+              className="text-[10px] font-bold px-3 py-1 clip-bevel-sm transition-all duration-150 disabled:opacity-40"
+              style={{ backgroundColor: `${c.accent}20`, color: c.accent, border: `1px solid ${c.accent}40` }}
+              title="Importer depuis le client LoL"
+            >
+              {importing ? '...' : 'Actualiser'}
+            </button>
+          </FeatureLock>
         </div>
+
+        {/* Bandeau métriques globales */}
+        {games.length > 0 && (
+          <div
+            className="clip-bevel-lg p-3 mb-3 grid grid-cols-5 gap-0"
+            style={{
+              background: `linear-gradient(135deg, ${c.bg} 0%, ${c.border}50 100%)`,
+              border: `1px solid ${c.border}`,
+            }}
+          >
+            {[
+              { label: 'Winrate', value: `${winrate}%`, color: winrate >= 50 ? '#22c55e' : '#ef4444' },
+              { label: 'Parties', value: `${wins}W ${losses}L`, color: c.text },
+              { label: 'KDA moyen', value: avgKda ?? '—', color: parseFloat(avgKda ?? '0') >= 3 ? '#22c55e' : c.accent },
+              { label: 'CS/min', value: avgCs ?? '—', color: c.text },
+              { label: 'Vision/min', value: avgVision ?? '—', color: c.text },
+            ].map(({ label, value, color }, i) => (
+              <div
+                key={label}
+                className="text-center px-2"
+                style={i > 0 ? { borderLeft: `1px solid ${c.border}50` } : {}}
+              >
+                <div className="text-[8px] font-black uppercase tracking-[0.15em] mb-0.5" style={{ color: c.text, opacity: 0.35 }}>
+                  {label}
+                </div>
+                <div className="font-mono font-black text-sm leading-none" style={{ color }}>
+                  {value}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Forme récente — dots W/L des 10 dernières parties */}
+        {games.length >= 3 && (
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-[8px] font-black uppercase tracking-[0.15em] flex-shrink-0" style={{ color: c.text, opacity: 0.28 }}>
+              Forme
+            </span>
+            <div className="flex items-center gap-0.5">
+              {recentForm.map((result, i) => (
+                <div
+                  key={i}
+                  title={result === 1 ? 'Victoire' : 'Défaite'}
+                  className="rounded-sm transition-transform hover:scale-125"
+                  style={{
+                    width: 13,
+                    height: 13,
+                    backgroundColor: result === 1 ? '#22c55e20' : '#ef444420',
+                    border: `1px solid ${result === 1 ? '#22c55e55' : '#ef444455'}`,
+                  }}
+                />
+              ))}
+            </div>
+            {recentForm.length >= 5 && (() => {
+              const last5 = recentForm.slice(-5)
+              const wr5 = Math.round((last5.filter(r => r === 1).length / 5) * 100)
+              const prev5 = recentForm.slice(-10, -5)
+              const wr5prev = prev5.length > 0
+                ? Math.round((prev5.filter(r => r === 1).length / prev5.length) * 100)
+                : wr5
+              const diff = wr5 - wr5prev
+              return (
+                <span
+                  className="text-[9px] font-mono font-black ml-1"
+                  style={{ color: diff > 0 ? '#22c55e' : diff < 0 ? '#ef4444' : c.text, opacity: diff === 0 ? 0.3 : 1 }}
+                >
+                  {diff > 0 ? `+${diff}%` : diff < 0 ? `${diff}%` : '—'}
+                </span>
+              )
+            })()}
+          </div>
+        )}
 
         {/* Sub-tabs Solo/Duo — Flex */}
         <div className="flex gap-2 pb-4">
@@ -156,7 +280,7 @@ export default function Stats() {
               <button
                 key={id}
                 onClick={() => setTab(id)}
-                className="px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-150"
+                className="px-4 py-1.5 clip-bevel-sm text-xs font-bold transition-all duration-150"
                 style={active ? {
                   backgroundColor: c.accent,
                   color: c.bg,
@@ -184,7 +308,7 @@ export default function Stats() {
             {Array.from({ length: 4 }).map((_, i) => (
               <div
                 key={i}
-                className="rounded-xl h-[100px] animate-pulse"
+                className="clip-bevel-lg h-[100px] animate-pulse"
                 style={{ backgroundColor: c.border, opacity: 0.4 }}
               />
             ))}
@@ -218,6 +342,7 @@ export default function Stats() {
               const kp = game.teamKills > 0
                 ? Math.round(((game.kills + game.assists) / game.teamKills) * 100)
                 : 0
+              const grade = computeGameGrade(game)
 
               const isReviewOpen = openReviewId === game.id
               const review = reviews[game.id]
@@ -227,7 +352,7 @@ export default function Stats() {
               return (
                 <div
                   key={game.id}
-                  className="rounded-xl overflow-hidden"
+                  className="clip-bevel-lg overflow-hidden"
                   style={{
                     background: `linear-gradient(135deg, ${c.bg} 0%, ${c.border}30 100%)`,
                     border: `1px solid ${c.border}`,
@@ -243,7 +368,7 @@ export default function Stats() {
                       <img
                         src={getChampionIconUrl(game.champion)}
                         alt={game.champion}
-                        className="w-10 h-10 rounded-lg"
+                        className="w-10 h-10 clip-bevel"
                         style={{ border: `2px solid ${isWin ? '#22c55e' : '#ef4444'}40` }}
                       />
                       <span
@@ -257,11 +382,19 @@ export default function Stats() {
                       </span>
                     </div>
 
-                    {/* Champion name + level */}
-                    <div className="min-w-0 flex-shrink-0" style={{ width: 80 }}>
-                      <p className="text-xs font-bold text-white truncate">{game.champion}</p>
+                    {/* Champion name + level + grade */}
+                    <div className="min-w-0 flex-shrink-0" style={{ width: 96 }}>
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <p className="text-xs font-bold text-white truncate">{game.champion}</p>
+                        <span
+                          className="flex-shrink-0 font-black rounded text-[9px] px-1 py-0.5 leading-none"
+                          style={{ backgroundColor: `${grade.color}25`, color: grade.color }}
+                        >
+                          {grade.grade}
+                        </span>
+                      </div>
                       <p className="text-[9px]" style={{ color: c.text, opacity: 0.4 }}>
-                        Niv. {game.level}
+                        Niv. {game.level} · {grade.score}pts
                       </p>
                     </div>
 
@@ -331,23 +464,134 @@ export default function Stats() {
                       ))}
                     </div>
 
-                    {/* Bouton Analyser */}
-                    <button
-                      onClick={() => handleAnalyse(game.id)}
-                      className="ml-auto text-[9px] font-bold px-2.5 py-1 rounded-full transition-all duration-150"
-                      style={isReviewOpen ? {
-                        backgroundColor: c.accent,
-                        color: c.bg,
-                      } : {
-                        backgroundColor: `${c.border}60`,
-                        color: c.text,
-                        opacity: 0.7,
-                      }}
-                    >
-                      {reviewLoading ? '...' : isReviewOpen ? '▲ Review' : '▼ Analyser'}
-                    </button>
+                    {/* Boutons Recap + Debrief IA + Analyser */}
+                    <div className="ml-auto flex items-center gap-1.5">
+                      <FeatureLock feature="smart_recap">
+                        <button
+                          onClick={() => handleRecap(game.id)}
+                          className="text-[9px] font-bold px-2.5 py-1 clip-bevel-sm transition-all duration-150"
+                          style={openRecapId === game.id ? {
+                            backgroundColor: '#f59e0b',
+                            color: '#000',
+                          } : {
+                            backgroundColor: '#f59e0b20',
+                            color: '#f59e0b',
+                          }}
+                        >
+                          {recaps[game.id] === 'loading' ? '...' : openRecapId === game.id ? '▲ Recap' : 'Recap IA'}
+                        </button>
+                      </FeatureLock>
+                      <FeatureLock feature="postgame_debrief">
+                        <button
+                          onClick={() => handleDebrief(game.id)}
+                          className="text-[9px] font-bold px-2.5 py-1 clip-bevel-sm transition-all duration-150"
+                          style={openDebriefId === game.id ? {
+                            backgroundColor: '#9B6EF3',
+                            color: '#fff',
+                          } : {
+                            backgroundColor: '#9B6EF320',
+                            color: '#9B6EF3',
+                          }}
+                        >
+                          {debriefs[game.id] === 'loading' ? '...' : openDebriefId === game.id ? '▲ Debrief' : 'Debrief IA'}
+                        </button>
+                      </FeatureLock>
+                      <button
+                        onClick={() => handleAnalyse(game.id)}
+                        className="text-[9px] font-bold px-2.5 py-1 clip-bevel-sm transition-all duration-150"
+                        style={isReviewOpen ? {
+                          backgroundColor: c.accent,
+                          color: c.bg,
+                        } : {
+                          backgroundColor: `${c.border}60`,
+                          color: c.text,
+                          opacity: 0.7,
+                        }}
+                      >
+                        {reviewLoading ? '...' : isReviewOpen ? '▲ Review' : '▼ Analyser'}
+                      </button>
+                    </div>
                   </div>
                 </div>
+
+                {/* ── Panneau Smart Recap inline ── */}
+                {openRecapId === game.id && recaps[game.id] && recaps[game.id] !== 'loading' && (() => {
+                  const r = recaps[game.id] as SmartRecap
+                  const recapGradeColor = GRADE_COLOR[r.grade] ?? '#fff'
+                  return (
+                    <div
+                      className="mt-2 clip-bevel px-4 py-3"
+                      style={{ backgroundColor: `${c.border}25`, border: `1px solid #f59e0b30` }}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: '#f59e0b' }}>
+                          Smart Recap
+                        </span>
+                        <span
+                          className="text-[10px] font-black px-1.5 py-0.5 rounded"
+                          style={{ backgroundColor: `${recapGradeColor}20`, color: recapGradeColor }}
+                        >
+                          {r.grade}
+                        </span>
+                      </div>
+                      <p className="text-xs font-semibold leading-relaxed mb-1.5" style={{ color: c.text }}>
+                        {r.headline}
+                      </p>
+                      <div className="flex items-start gap-1.5">
+                        <span className="text-[10px] mt-0.5" style={{ color: '#f59e0b' }}>★</span>
+                        <p className="text-[10px] leading-relaxed" style={{ color: c.text, opacity: 0.7 }}>
+                          {r.mvpMoment}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* ── Panneau debrief IA inline ── */}
+                {openDebriefId === game.id && debriefs[game.id] && debriefs[game.id] !== 'loading' && (() => {
+                  const d = debriefs[game.id] as PostGameDebriefResponse
+                  return (
+                    <div
+                      className="mt-2 clip-bevel px-4 py-3"
+                      style={{ backgroundColor: `${c.border}25`, border: `1px solid #9B6EF330` }}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: '#9B6EF3' }}>
+                          AI Debrief
+                        </span>
+                        <span className="text-[8px] px-1.5 py-0.5 rounded font-black" style={{ backgroundColor: '#9B6EF320', color: '#9B6EF3' }}>
+                          PRO
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 mb-2">
+                        <div>
+                          <span className="text-[9px] font-bold block mb-1" style={{ color: '#22c55e' }}>Forces</span>
+                          {d.strengths.map((s, i) => (
+                            <div key={i} className="flex items-start gap-1 mb-0.5">
+                              <span className="mt-1 w-1 h-1 rounded-full flex-shrink-0" style={{ backgroundColor: '#22c55e' }} />
+                              <span className="text-[10px] leading-relaxed" style={{ color: c.text, opacity: 0.7 }}>{s}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div>
+                          <span className="text-[9px] font-bold block mb-1" style={{ color: '#f59e0b' }}>Améliorations</span>
+                          {d.improvements.map((s, i) => (
+                            <div key={i} className="flex items-start gap-1 mb-0.5">
+                              <span className="mt-1 w-1 h-1 rounded-full flex-shrink-0" style={{ backgroundColor: '#f59e0b' }} />
+                              <span className="text-[10px] leading-relaxed" style={{ color: c.text, opacity: 0.7 }}>{s}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="px-3 py-2 clip-bevel" style={{ backgroundColor: `${c.accent}10`, border: `1px solid ${c.accent}30` }}>
+                        <span className="text-[9px] font-black uppercase tracking-widest block mb-1" style={{ color: c.accent, opacity: 0.6 }}>
+                          Conseil principal
+                        </span>
+                        <span className="text-xs" style={{ color: c.text }}>{d.keyTakeaway}</span>
+                      </div>
+                    </div>
+                  )
+                })()}
 
                 {/* ── Panneau review inline ── */}
                 {isReviewOpen && reviewData && (
@@ -406,7 +650,7 @@ function ReviewPanel({ timeline, gameId, launchingReplay, onLaunchReplay, colors
       <div className="flex items-start gap-3 mb-3">
         {/* Grade */}
         <div
-          className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-xl font-black"
+          className="flex-shrink-0 w-10 h-10 clip-bevel flex items-center justify-center text-xl font-black"
           style={{
             backgroundColor: `${gradeColor}18`,
             border: `2px solid ${gradeColor}50`,
@@ -425,7 +669,7 @@ function ReviewPanel({ timeline, gameId, launchingReplay, onLaunchReplay, colors
         <button
           onClick={() => onLaunchReplay(gameId)}
           disabled={isLaunching}
-          className="flex-shrink-0 text-[9px] font-bold px-2.5 py-1.5 rounded-lg transition-all duration-150"
+          className="flex-shrink-0 text-[9px] font-bold px-2.5 py-1.5 clip-bevel transition-all duration-150"
           style={{
             backgroundColor: isLaunching ? `${colors.accent}30` : `${colors.accent}20`,
             color: isLaunching ? colors.accent : colors.accent,
@@ -439,7 +683,7 @@ function ReviewPanel({ timeline, gameId, launchingReplay, onLaunchReplay, colors
 
       {/* ── Stats chiffrées ── */}
       <div
-        className="grid grid-cols-3 gap-2 mb-3 rounded-lg p-2.5"
+        className="grid grid-cols-3 gap-2 mb-3 clip-bevel p-2.5"
         style={{ backgroundColor: `${colors.border}30` }}
       >
         {([
@@ -462,7 +706,7 @@ function ReviewPanel({ timeline, gameId, launchingReplay, onLaunchReplay, colors
         {[...summary.errors, ...summary.strengths, ...summary.tips].map((ev: ReviewEvent, i: number) => (
           <div
             key={i}
-            className="flex items-start gap-2 rounded-lg px-2.5 py-2"
+            className="flex items-start gap-2 clip-bevel px-2.5 py-2"
             style={{ backgroundColor: `${EVENT_COLOR[ev.category]}10` }}
           >
             <span

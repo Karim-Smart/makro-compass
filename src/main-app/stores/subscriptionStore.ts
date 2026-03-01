@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { IPC } from '../../../shared/ipc-channels'
 import type { SubscriptionStatus } from '../../../shared/types'
+import { canAccess as checkAccess, type GatedFeature } from '../../../shared/feature-gates'
 
 interface SubscriptionState {
   status: SubscriptionStatus | null
@@ -10,6 +11,7 @@ interface SubscriptionState {
   setStatus: (status: SubscriptionStatus) => void
   setLoading: (value: boolean) => void
   refresh: () => void
+  canAccess: (feature: GatedFeature) => boolean
 }
 
 const DEFAULT_STATUS: SubscriptionStatus = {
@@ -36,6 +38,11 @@ export const useSubscriptionStore = create<SubscriptionState>((set) => ({
         if (status) useSubscriptionStore.getState().setStatus(status as SubscriptionStatus)
       })
       .catch(() => set({ isLoading: false }))
+  },
+
+  canAccess: (feature: GatedFeature) => {
+    const tier = useSubscriptionStore.getState().status?.tier ?? 'free'
+    return checkAccess(feature, tier)
   }
 }))
 

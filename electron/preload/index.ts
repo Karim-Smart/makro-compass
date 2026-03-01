@@ -26,6 +26,9 @@ const electronAPI = {
       IPC.SETTINGS_UPDATE,
       IPC.ROLE_CHANGE,
       IPC.IMPORT_RUNES,
+      'window:minimize',
+      'window:maximize',
+      'window:close',
     ]
     if (validChannels.includes(channel as (typeof validChannels)[number])) {
       ipcRenderer.send(channel, data)
@@ -42,6 +45,10 @@ const electronAPI = {
       IPC.REVIEW_GENERATE,
       IPC.LAUNCH_REPLAY,
       IPC.RANKED_HISTORY_IMPORT,
+      IPC.DRAFT_ORACLE,
+      IPC.POSTGAME_DEBRIEF,
+      IPC.SMART_RECAP,
+      IPC.OPEN_CHECKOUT,
     ]
     if (validChannels.includes(channel as (typeof validChannels)[number])) {
       return ipcRenderer.invoke(channel, data)

@@ -15,16 +15,27 @@ function useNow(interval = 500) {
   return now
 }
 
-function fmtCountdown(targetMs: number | null, now: number): { text: string; urgent: boolean } {
-  if (targetMs === null) return { text: '--:--', urgent: false }
+function fmtCountdown(targetMs: number | null, now: number): { text: string; urgencyColor: string } {
+  if (targetMs === null) return { text: '--:--', urgencyColor: '#94a3b8' }
   const remaining = Math.max(0, targetMs - now)
   const s = Math.floor(remaining / 1000)
   const m = Math.floor(s / 60)
   const ss = s % 60
+  const urgencyColor = remaining > 60_000 ? '#22c55e' : remaining > 30_000 ? '#f59e0b' : '#ef4444'
   return {
     text: `${m}:${ss.toString().padStart(2, '0')}`,
-    urgent: remaining > 0 && remaining < 30_000,
+    urgencyColor,
   }
+}
+
+const DRAGON_TYPE_SHORT: Record<string, string> = {
+  Infernal:  '🔥',
+  Mountain:  '🪨',
+  Ocean:     '🌊',
+  Cloud:     '💨',
+  Hextech:   '⚡',
+  Chemtech:  '☠️',
+  Elder:     '🌀',
 }
 
 const OBJECTIVES = [
@@ -46,13 +57,9 @@ export function TimerOverlay({ timers, colors }: Props) {
 
   return (
     <div
-      className="rounded-xl overflow-hidden animate-fade-in min-w-[160px]"
+      className="overflow-hidden animate-fade-in min-w-[160px]"
       style={{
-        background: 'rgba(8, 10, 18, 0.85)',
-        border: `1px solid ${colors.border}`,
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+        background: 'transparent',
       }}
     >
       {/* Header */}
@@ -67,14 +74,22 @@ export function TimerOverlay({ timers, colors }: Props) {
         {active.map(({ key, label, icon }) => {
           const timer = timers[key]
           const isDead = 'isDead' in timer ? timer.isDead : false
-          const { text, urgent } = fmtCountdown(timer.nextSpawn, now)
+          const { text, urgencyColor } = fmtCountdown(timer.nextSpawn, now)
+          // Type dragon si disponible (ex: 🔥 Infernal)
+          const dragonType = key === 'dragon' && 'type' in timer && timer.type
+            ? timer.type as string
+            : null
+          const dragonEmoji = dragonType ? DRAGON_TYPE_SHORT[dragonType] : null
+          const displayLabel = dragonType
+            ? `${dragonType}`
+            : label
 
           return (
             <div key={key} className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-1.5">
-                <span className="text-sm leading-none">{icon}</span>
+                <span className="text-sm leading-none">{dragonEmoji ?? icon}</span>
                 <span className="text-[11px] font-medium" style={{ color: colors.text, opacity: 0.75 }}>
-                  {label}
+                  {displayLabel}
                 </span>
               </div>
 
@@ -82,8 +97,9 @@ export function TimerOverlay({ timers, colors }: Props) {
                 <span
                   className="text-xs font-mono font-black"
                   style={{
-                    color: urgent ? '#ef4444' : '#94a3b8',
-                    animation: urgent ? 'pulseOpacity 0.8s ease-in-out infinite' : 'none',
+                    color: urgencyColor,
+                    animation: urgencyColor === '#ef4444' ? 'pulseOpacity 0.8s ease-in-out infinite' : 'none',
+                    transition: 'color 0.5s ease',
                   }}
                 >
                   ⟳ {text}

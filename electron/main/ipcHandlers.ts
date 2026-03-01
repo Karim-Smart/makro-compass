@@ -1,22 +1,29 @@
-import { ipcMain, BrowserWindow, globalShortcut, safeStorage } from 'electron'
+import { ipcMain, BrowserWindow, globalShortcut, safeStorage, shell } from 'electron'
 import Store from 'electron-store'
 import { IPC } from '../../shared/ipc-channels'
-import type { CoachingStyle, UserSettings } from '../../shared/types'
+import type { CoachingStyle, UserSettings, SubscriptionTier } from '../../shared/types'
 import { startRiotAgent, stopRiotAgent } from '../agents/riotAgent'
-import { setCoachingStyle, setApiKey, getCoachingStyle, startAICoachAgent, stopAICoachAgent } from '../agents/aiCoachAgent'
+import { setCoachingStyle, setApiKey, getCoachingStyle, startAICoachAgent, stopAICoachAgent, setShotcallerMode, setCustomCoachTone } from '../agents/aiCoachAgent'
+import { setAnthropicApiKey } from '../agents/anthropicClient'
 import { getSubscriptionStatus } from '../agents/subscriptionAgent'
 import { startTimerAgent, stopTimerAgent } from '../agents/timerAgent'
 import { startLcuAgent, stopLcuAgent, exportRunePageToClient, launchReplay, importRecentRankedGames } from '../agents/lcuAgent'
 import { getAdviceHistory, getQuotaStatus, getRankedHistory } from '../agents/quotaManager'
 import { generateBuildRecommendations } from '../agents/buildEngine'
 import { generateReviewTimeline } from '../agents/reviewEngine'
-import type { RankedGame } from '../../shared/types'
+import { analyzeDraft } from '../agents/draftOracle'
+import { generateDebrief } from '../agents/postGameDebrief'
+import { guardFeature } from '../agents/subscriptionAgent'
+import { generateSmartRecapForGame } from '../agents/smartRecap'
+import { canAccess } from '../../shared/feature-gates'
+import { DEV_MOCK_AI, DEV_OVERRIDE_TIER } from '../../shared/constants'
+import type { RankedGame, DraftOracleRequest } from '../../shared/types'
 import { generateRunePages } from '../../shared/rune-data'
-import { getOverlayWindows, setPanelSettings } from './windowManager'
+import { getOverlayWindows, setPanelSettings, setOverlayTier } from './windowManager'
 
 // ─── Persistance des settings ─────────────────────────────────────────────────
 
-const DEFAULT_OVERLAY_PANELS = { stats: true, timers: true, advice: true, style: true, build: true }
+const DEFAULT_OVERLAY_PANELS = { stats: true, timers: true, advice: true, style: true, build: true, wincondition: false }
 
 const DEFAULT_SETTINGS: UserSettings = {
   hotkey: 'F9',
@@ -27,11 +34,40 @@ const DEFAULT_SETTINGS: UserSettings = {
   overlayPanels: DEFAULT_OVERLAY_PANELS,
   voiceAlerts: true,
   voiceVolume: 0.8,
+  shotcallerMode: false,
+  customCoachTone: '',
 }
 
 const store = new Store<{ settings: UserSettings }>({
   defaults: { settings: DEFAULT_SETTINGS }
 })
+
+// ─── Hotkey overlay ───────────────────────────────────────────────────────────
+
+let _registeredHotkey = ''
+let _mainWindowRef: BrowserWindow | null = null
+
+function registerOverlayHotkey(key: string): void {
+  if (_registeredHotkey) {
+    try { globalShortcut.unregister(_registeredHotkey) } catch { /* ignoré */ }
+  }
+  const ok = globalShortcut.register(key, () => {
+    const windows = getOverlayWindows()
+    if (windows.length === 0) return
+    const shouldHide = windows[0].isVisible()
+    for (const win of windows) {
+      if (shouldHide) win.hide()
+      else win.show()
+    }
+    _mainWindowRef?.webContents.send(IPC.OVERLAY_TOGGLE, !shouldHide)
+  })
+  if (ok) {
+    _registeredHotkey = key
+    console.log(`[IPC] Raccourci overlay: ${key}`)
+  } else {
+    console.warn(`[IPC] Impossible d'enregistrer le raccourci: ${key}`)
+  }
+}
 
 function loadSettings(): UserSettings {
   const settings = store.get('settings', DEFAULT_SETTINGS)
@@ -78,11 +114,23 @@ export function setupIpcHandlers(
   overlayWindows: BrowserWindow[]
 ): UserSettings {
   const initialSettings = loadSettings()
+  _mainWindowRef = mainWindow
+
+  // Enregistrer le raccourci overlay depuis les settings persistés
+  registerOverlayHotkey(initialSettings.hotkey ?? 'F9')
+
   // Appliquer les préférences de panneaux au démarrage
   setPanelSettings(initialSettings.overlayPanels ?? DEFAULT_OVERLAY_PANELS)
 
-  // Changement du style de coaching
-  ipcMain.on(IPC.STYLE_CHANGE, (_event, style: CoachingStyle) => {
+  // Changement du style de coaching (guard: styles non-LCK nécessitent Pro+)
+  ipcMain.on(IPC.STYLE_CHANGE, async (_event, style: CoachingStyle) => {
+    if (style !== 'LCK') {
+      const allowed = await guardFeature('all_coaching_styles')
+      if (!allowed) {
+        console.log(`[IPC] Style ${style} bloqué — tier free (LCK uniquement)`)
+        return
+      }
+    }
     setCoachingStyle(style)
     saveSettings({ selectedStyle: style })
     for (const win of getOverlayWindows()) {
@@ -97,7 +145,9 @@ export function setupIpcHandlers(
   })
 
   ipcMain.handle(IPC.SUBSCRIPTION_CHECK, async () => {
-    return await getSubscriptionStatus()
+    const status = await getSubscriptionStatus()
+    setOverlayTier(status.tier)
+    return status
   })
 
   ipcMain.on(IPC.SETTINGS_UPDATE, (_event, partial: Partial<UserSettings>) => {
@@ -106,6 +156,11 @@ export function setupIpcHandlers(
 
     if (partial.apiKey) {
       setApiKey(partial.apiKey)
+      setAnthropicApiKey(partial.apiKey)
+    }
+
+    if (partial.hotkey) {
+      registerOverlayHotkey(partial.hotkey)
     }
 
     if (partial.overlayOpacity !== undefined) {
@@ -116,6 +171,14 @@ export function setupIpcHandlers(
 
     if (partial.overlayPanels !== undefined) {
       setPanelSettings(partial.overlayPanels)
+    }
+
+    // Shotcaller mode et custom coach (Elite)
+    if (partial.shotcallerMode !== undefined) {
+      setShotcallerMode(partial.shotcallerMode)
+    }
+    if (partial.customCoachTone !== undefined) {
+      setCustomCoachTone(partial.customCoachTone)
     }
 
     // Syncer les settings voix vers les overlays en temps réel
@@ -156,9 +219,51 @@ export function setupIpcHandlers(
     return launchReplay(gameId)
   })
 
-  // Import manuel de l'historique LCU (bouton Actualiser dans Stats)
+  // Import manuel de l'historique LCU (bouton Actualiser dans Stats) — Pro+ requis
   ipcMain.handle(IPC.RANKED_HISTORY_IMPORT, async () => {
+    const allowed = await guardFeature('ranked_import')
+    if (!allowed) {
+      console.log('[IPC] Import LCU bloqué — tier free')
+      return 0
+    }
     return importRecentRankedGames(10)
+  })
+
+  // AI Post-Game Debrief (Pro+)
+  ipcMain.handle(IPC.POSTGAME_DEBRIEF, async (_event, gameId: number) => {
+    try {
+      const games = getRankedHistory() as RankedGame[]
+      const game = games.find((g) => g.id === gameId)
+      if (!game) return null
+      return await generateDebrief(game)
+    } catch (err) {
+      console.error('[IPC] Erreur Post-Game Debrief:', (err as Error).message)
+      return null
+    }
+  })
+
+  // AI Smart Recap (Pro+)
+  ipcMain.handle(IPC.SMART_RECAP, async (_event, gameId: number) => {
+    try {
+      const games = getRankedHistory() as RankedGame[]
+      const game = games.find((g) => g.id === gameId)
+      if (!game) return null
+      return await generateSmartRecapForGame(game)
+    } catch (err) {
+      console.error('[IPC] Erreur Smart Recap:', (err as Error).message)
+      return null
+    }
+  })
+
+  // AI Draft Oracle (Pro+)
+  ipcMain.handle(IPC.DRAFT_ORACLE, async (_event, req: DraftOracleRequest) => {
+    try {
+      if (!req?.myTeam || !req?.theirTeam) return null
+      return await analyzeDraft(req)
+    } catch (err) {
+      console.error('[IPC] Erreur Draft Oracle:', (err as Error).message)
+      return null
+    }
   })
 
   // Changement de rôle (depuis la page Draft)
@@ -209,6 +314,35 @@ export function setupIpcHandlers(
     }
   })
 
+  // Stripe checkout — ouvre l'URL dans le navigateur
+  ipcMain.handle(IPC.OPEN_CHECKOUT, async (_event, tier: SubscriptionTier) => {
+    // TODO: Remplacer par la vraie URL Stripe quand le backend sera prêt
+    const checkoutUrls: Record<string, string> = {
+      pro: 'https://buy.stripe.com/placeholder-pro',
+      elite: 'https://buy.stripe.com/placeholder-elite',
+    }
+    const url = checkoutUrls[tier]
+    if (url && !url.includes('placeholder')) {
+      shell.openExternal(url)
+      console.log(`[IPC] Ouverture checkout Stripe → ${tier}`)
+    } else {
+      console.warn(`[IPC] Checkout ${tier} : URL Stripe non configurée (placeholder)`)
+    }
+    return true
+  })
+
+  // ─── Window controls (frameless) ─────────────────────────────────────────
+  ipcMain.on('window:minimize', () => {
+    mainWindow.minimize()
+  })
+  ipcMain.on('window:maximize', () => {
+    if (mainWindow.isMaximized()) mainWindow.unmaximize()
+    else mainWindow.maximize()
+  })
+  ipcMain.on('window:close', () => {
+    mainWindow.close()
+  })
+
   // Refresh build
   ipcMain.on(IPC.REFRESH_BUILD, () => {
     const g = global as typeof global & { __lastGameData?: import('../../shared/types').GameData }
@@ -248,13 +382,19 @@ function setupWindowRegistry(
  */
 async function startAgents(mainWindow: BrowserWindow, overlayWindows: BrowserWindow[]): Promise<void> {
   try {
+    if (DEV_MOCK_AI) {
+      console.log(`[Main] 🤖 Mode IA mock ACTIF — aucun appel API Anthropic (tier: ${DEV_OVERRIDE_TIER ?? 'backend'})`)
+    }
     const settings = loadSettings()
 
     if (settings.apiKey) {
       setApiKey(settings.apiKey)
+      setAnthropicApiKey(settings.apiKey)
     }
 
     setCoachingStyle(settings.selectedStyle)
+    if (settings.shotcallerMode) setShotcallerMode(settings.shotcallerMode)
+    if (settings.customCoachTone) setCustomCoachTone(settings.customCoachTone)
 
     // Envoyer les settings au renderer principal
     mainWindow.webContents.once('did-finish-load', () => {
@@ -277,6 +417,7 @@ async function startAgents(mainWindow: BrowserWindow, overlayWindows: BrowserWin
     await startLcuAgent()
 
     const status = await getSubscriptionStatus()
+    setOverlayTier(status.tier)
     mainWindow.webContents.send(IPC.SUBSCRIPTION_STATUS, status)
   } catch (err) {
     console.error('[Main] Erreur démarrage agents:', err)

@@ -15,6 +15,9 @@ import { detectAlerts, resetAlertEngine } from './alertEngine'
 import { generateBuildRecommendations } from './buildEngine'
 import { generateRunePages } from '../../shared/rune-data'
 import { getLastQueueType, detectCurrentQueueType, isInReplayMode } from './lcuAgent'
+import { onGameStart as onWinConditionStart, updateGameData as updateWinConditionData, onGameEnd as onWinConditionEnd } from './winConditionTracker'
+import { triggerMatchupBriefing, resetMatchupBriefing } from './matchupBriefing'
+import { analyzeTilt, onTiltGameStart, onTiltGameEnd } from './tiltDetector'
 import { saveRankedGame, getRankedHistory } from './quotaManager'
 import { generateReviewTimeline } from './reviewEngine'
 import type { ReviewTimeline, ReviewEvent, RankedGame } from '../../shared/types'
@@ -177,6 +180,12 @@ function parseGameData(raw: RiotApiResponse): GameData {
         position: myPosition,
         isDead: opponent.isDead ?? false,
         respawnTimer: opponent.respawnTimer ?? 0,
+        oppKda: {
+          kills:   opponent.scores?.kills   ?? 0,
+          deaths:  opponent.scores?.deaths  ?? 0,
+          assists: opponent.scores?.assists ?? 0,
+        },
+        oppCs: opponent.scores?.creepScore ?? 0,
       }
     }
   }
@@ -314,6 +323,8 @@ async function poll(): Promise<void> {
         broadcastToWindows(IPC.REPLAY_DETECTED, { isReplay: true })
       } else {
         onGameStart(gameData)
+        onWinConditionStart()
+        onTiltGameStart()
 
         // Broadcast runes au début de partie
         const style = getCoachingStyle()
@@ -322,6 +333,11 @@ async function poll(): Promise<void> {
 
         // Détecter le type de queue (ranked ?) via LCU
         detectCurrentQueueType()
+
+        // Matchup briefing au début de partie (une seule fois)
+        triggerMatchupBriefing(gameData).catch((err) =>
+          console.error('[RiotAgent] Erreur matchup briefing:', (err as Error).message)
+        )
       }
 
       console.log(`[RiotAgent] ${replayMode ? 'Replay' : 'Partie'} détecté — ${gameData.champion} (${gameData.gameMode})`)
@@ -330,6 +346,9 @@ async function poll(): Promise<void> {
     if (!replayMode) {
       processNewEvents(raw.events, gameData)
       updateGameData(gameData)
+      updateWinConditionData(gameData)
+      // Analyser le tilt (Elite) — algorithme + reset mental si nécessaire
+      analyzeTilt(gameData).catch(() => { /* silencieux */ })
     }
 
     // Ne broadcaster GAME_DATA que si les stats importantes ont changé
@@ -386,10 +405,11 @@ async function poll(): Promise<void> {
         console.log(`[AlertEngine] ${alert.type}: ${alert.text}`)
       }
 
-      // Générer et broadcaster le macro tip (seulement si le texte change)
+      // macroTipsEngine : urgences critiques seulement (soul point, baron buff, respawn court, etc.)
+      // L'IA (aiCoachAgent) génère les conseils stratégiques généraux toutes les ~45s.
       const currentStyle = getCoachingStyle()
       const tip = generateMacroTip(gameData, currentStyle)
-      if (tip.text !== lastBroadcastedTip) {
+      if (tip.priority === 'high' && tip.text !== lastBroadcastedTip) {
         lastBroadcastedTip = tip.text
         broadcastToWindows(IPC.OVERLAY_SHOW_ADVICE, {
           text: tip.text,
@@ -432,6 +452,7 @@ async function poll(): Promise<void> {
         const result = lastGameResult ?? (lastGameData.teamKills > lastGameData.enemyKills ? 'win' : 'loss')
         saveRankedGame(lastGameData, queueType, result)
         console.log(`[RiotAgent] Partie classée sauvegardée — ${lastGameData.champion} ${result} (${queueType})`)
+        broadcastToWindows(IPC.RANKED_IMPORT_DONE, { count: 1 })
       }
 
       wasInGame = false
@@ -446,6 +467,9 @@ async function poll(): Promise<void> {
       broadcastToWindows(IPC.GAME_STATUS, status)
       hideOverlay()
       onGameEnd()
+      onWinConditionEnd()
+      onTiltGameEnd()
+      resetMatchupBriefing()
       resetTimers()
       resetMacroEngine()
       resetAlertEngine()

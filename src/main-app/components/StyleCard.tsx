@@ -26,7 +26,7 @@ export function StyleCard({ style, isSelected, onSelect }: StyleCardProps) {
   return (
     <button
       onClick={() => onSelect(style)}
-      className="relative w-full text-left rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] group"
+      className="relative w-full text-left clip-bevel-lg overflow-hidden transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] group"
       style={{
         background: `linear-gradient(135deg, ${colors.bg} 0%, ${colors.border}60 100%)`,
         border: `2px solid ${isSelected ? colors.accent : colors.border}`,
@@ -44,7 +44,7 @@ export function StyleCard({ style, isSelected, onSelect }: StyleCardProps) {
       {/* Badge ACTIF */}
       {isSelected && (
         <div
-          className="absolute top-3 right-3 z-10 flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black tracking-widest"
+          className="absolute top-3 right-3 z-10 flex items-center gap-1 px-2.5 py-1 clip-bevel-sm text-xs font-black tracking-widest"
           style={{ backgroundColor: colors.accent, color: colors.bg }}
         >
           <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
@@ -56,7 +56,7 @@ export function StyleCard({ style, isSelected, onSelect }: StyleCardProps) {
         {/* Logo de la ligue */}
         <div className="flex-shrink-0 flex items-center justify-center">
           <div
-            className="w-20 h-20 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110"
+            className="w-20 h-20 clip-bevel flex items-center justify-center transition-all duration-300 group-hover:scale-110"
             style={{
               background: `radial-gradient(circle, ${colors.border}80 0%, transparent 70%)`,
               filter: isSelected ? `drop-shadow(0 0 12px ${colors.glow}80)` : 'none'
@@ -94,7 +94,7 @@ export function StyleCard({ style, isSelected, onSelect }: StyleCardProps) {
             {config.traits.map((trait) => (
               <span
                 key={trait}
-                className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider"
+                className="text-[10px] font-bold px-2 py-0.5 clip-bevel-sm uppercase tracking-wider"
                 style={{
                   backgroundColor: `${colors.accent}18`,
                   border: `1px solid ${colors.accent}40`,

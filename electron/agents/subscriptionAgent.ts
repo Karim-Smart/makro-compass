@@ -1,7 +1,8 @@
 import axios from 'axios'
 import { getQuotaStatus } from './quotaManager'
-import { QUOTA_RULES } from '../../shared/constants'
+import { QUOTA_RULES, DEV_OVERRIDE_TIER } from '../../shared/constants'
 import type { SubscriptionStatus, SubscriptionTier } from '../../shared/types'
+import { canAccess, type GatedFeature } from '../../shared/feature-gates'
 
 // URL du backend Railway (à configurer dans .env)
 const BACKEND_URL = process.env.BACKEND_URL ?? 'https://localhost:8000'
@@ -20,6 +21,24 @@ export async function getSubscriptionStatus(): Promise<SubscriptionStatus> {
 
   // quotaUsed est toujours lu en temps réel depuis SQLite (pas mis en cache)
   const quota = getQuotaStatus()
+
+  // ── Dev mode : tier simulé, pas d'appel backend ─────────────────────────
+  if (DEV_OVERRIDE_TIER) {
+    const rules = QUOTA_RULES[DEV_OVERRIDE_TIER]
+    cachedStatus = {
+      tier: DEV_OVERRIDE_TIER,
+      isActive: true,
+      expiresAt: null,
+      quotaUsed: quota.used,
+      quotaMax: rules.maxPerDay,
+      nextResetAt: quota.resetAt,
+    }
+    if (lastCheckTime === 0) {
+      console.log(`[SubscriptionAgent] Mode dev — tier simulé: ${DEV_OVERRIDE_TIER}`)
+    }
+    lastCheckTime = now
+    return cachedStatus
+  }
 
   // Le tier/abonnement est mis en cache 5 min pour éviter les appels réseau
   if (cachedStatus && now - lastCheckTime < CACHE_TTL_MS) {
@@ -80,6 +99,15 @@ export async function getSubscriptionStatus(): Promise<SubscriptionStatus> {
 export function invalidateSubscriptionCache(): void {
   cachedStatus = null
   lastCheckTime = 0
+}
+
+/**
+ * Vérifie si le tier actuel a accès à une fonctionnalité gatée.
+ * Retourne true si l'accès est autorisé, false sinon.
+ */
+export async function guardFeature(feature: GatedFeature): Promise<boolean> {
+  const status = await getSubscriptionStatus()
+  return canAccess(feature, status.tier)
 }
 
 interface BackendSubscriptionResponse {

@@ -54,6 +54,27 @@ export const IPC = {
 
   // Déclencher manuellement l'import LCU (invoke → retourne le nb de parties importées)
   RANKED_HISTORY_IMPORT: 'ranked:history-import',
+
+  // AI Draft Oracle (invoke)
+  DRAFT_ORACLE: 'draft:oracle',
+
+  // AI Post-Game Debrief (invoke)
+  POSTGAME_DEBRIEF: 'postgame:debrief',
+
+  // AI Win Condition Tracker (main → overlay)
+  WIN_CONDITION: 'wincondition:data',
+
+  // Stripe checkout (invoke)
+  OPEN_CHECKOUT: 'stripe:open-checkout',
+
+  // AI Matchup Briefing (main → overlay advice)
+  MATCHUP_BRIEFING: 'matchup:briefing',
+
+  // AI Tilt Detector (main → overlay)
+  TILT_STATUS: 'tilt:status',
+
+  // AI Smart Recap (invoke — pour une game donnée)
+  SMART_RECAP: 'smart:recap',
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

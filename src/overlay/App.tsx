@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { IPC } from '../../shared/ipc-channels'
 import { COACHING_STYLES } from '../../shared/constants'
-import type { CoachAdvice, CoachingStyle, GameAlert, GameData, GameStatus, ObjectiveTimers, RunePageSet, BuildRecommendations, ReviewEvent } from '../../shared/types'
+import type { CoachAdvice, CoachingStyle, GameAlert, GameData, GameStatus, ObjectiveTimers, RunePageSet, BuildRecommendations, ReviewEvent, WinConditionData, MatchupBriefingData, TiltStatus } from '../../shared/types'
 import { AdviceOverlay } from './components/AdviceOverlay'
 import { AdviceMinBar } from './components/AdviceMinBar'
 import { TimerOverlay } from './components/TimerOverlay'
 import { StatsOverlay } from './components/StatsOverlay'
-import { ObjectivesOverlay } from './components/ObjectivesOverlay'
 import { ItemsOverlay } from './components/ItemsOverlay'
 import { LevelAlert } from './components/LevelAlert'
 import { AlertOverlay } from './components/AlertOverlay'
@@ -14,6 +13,9 @@ import { StyleSwitcher } from './components/StyleSwitcher'
 import { RunesOverlay } from './components/RunesOverlay'
 import { BuildStrip } from './components/BuildStrip'
 import { ReviewEventOverlay } from './components/ReviewEventOverlay'
+import { WinConditionOverlay } from './components/WinConditionOverlay'
+import { MatchupBriefingCard } from './components/MatchupBriefingCard'
+import { TiltIndicator } from './components/TiltIndicator'
 
 // Lire le panel à afficher depuis l'URL (?panel=stats|timers|advice)
 const params = new URLSearchParams(window.location.search)
@@ -73,6 +75,15 @@ export default function OverlayApp() {
   // Runes et Build
   const [runePages, setRunePages] = useState<RunePageSet | null>(null)
   const [buildData, setBuildData] = useState<BuildRecommendations | null>(null)
+
+  // Win Condition Tracker (Elite)
+  const [winCondition, setWinCondition] = useState<WinConditionData | null>(null)
+
+  // Matchup Briefing (Pro+) — affiché au début de partie dans le panneau advice
+  const [matchupBriefing, setMatchupBriefing] = useState<MatchupBriefingData | null>(null)
+
+  // Tilt Detector (Elite) — indicateur dans le panneau stats
+  const [tiltStatus, setTiltStatus] = useState<TiltStatus | null>(null)
 
   // Review mode (replay coaching)
   const [isReplayMode, setIsReplayMode] = useState(false)
@@ -173,9 +184,24 @@ export default function OverlayApp() {
         setAlert(null)
         setRunePages(null)
         setBuildData(null)
+        setWinCondition(null)
+        setMatchupBriefing(null)
+        setTiltStatus(null)
         if (rotateTimerRef.current) clearInterval(rotateTimerRef.current)
         if (alertTimeoutRef.current) clearTimeout(alertTimeoutRef.current)
       }
+    }
+
+    const onWinCondition = (data: unknown) => {
+      setWinCondition(data as WinConditionData)
+    }
+
+    const onMatchupBriefing = (data: unknown) => {
+      setMatchupBriefing(data as MatchupBriefingData)
+    }
+
+    const onTiltStatus = (data: unknown) => {
+      setTiltStatus(data as TiltStatus)
     }
 
     const onTimers = (t: unknown) => {
@@ -232,6 +258,9 @@ export default function OverlayApp() {
     api.on(IPC.REPLAY_DETECTED, onReplayDetected)
     api.on(IPC.OVERLAY_REVIEW, onOverlayReview)
     api.on(IPC.SETTINGS_UPDATE, onSettingsUpdate)
+    api.on(IPC.WIN_CONDITION, onWinCondition)
+    api.on(IPC.MATCHUP_BRIEFING, onMatchupBriefing)
+    api.on(IPC.TILT_STATUS, onTiltStatus)
 
     return () => {
       if (rotateTimerRef.current) clearInterval(rotateTimerRef.current)
@@ -248,6 +277,9 @@ export default function OverlayApp() {
       api.removeListener(IPC.REPLAY_DETECTED, onReplayDetected)
       api.removeListener(IPC.OVERLAY_REVIEW, onOverlayReview)
       api.removeListener(IPC.SETTINGS_UPDATE, onSettingsUpdate)
+      api.removeListener(IPC.WIN_CONDITION, onWinCondition)
+      api.removeListener(IPC.MATCHUP_BRIEFING, onMatchupBriefing)
+      api.removeListener(IPC.TILT_STATUS, onTiltStatus)
     }
   }, [])
 
@@ -271,29 +303,30 @@ export default function OverlayApp() {
     <div
       className="w-full h-full"
       style={{
-        background: '#080A12',
-        // Toute la fenêtre est draggable
-        // @ts-expect-error: propriété CSS Electron pour le drag
-        WebkitAppRegion: 'drag',
+        background: 'transparent',
         userSelect: 'none',
-        borderRadius: 8,
-        overflow: 'hidden',
       }}
     >
       {panel === 'stats' && inGame && (
-        <StatsOverlay gameData={gameData!} colors={colors} />
+        <div className="relative h-full overlay-glass clip-bevel">
+          <StatsOverlay gameData={gameData!} colors={colors} />
+          {tiltStatus && tiltStatus.tiltLevel !== 'none' && (
+            <div className="absolute top-1 right-1 z-10">
+              <TiltIndicator tilt={tiltStatus} />
+            </div>
+          )}
+        </div>
       )}
 
       {panel === 'timers' && inGame && (
-        <div className="space-y-1">
+        <div className="space-y-1 overlay-glass clip-bevel h-full">
           {timers && <TimerOverlay timers={timers} colors={colors} />}
-          <ObjectivesOverlay gameData={gameData!} colors={colors} />
           <ItemsOverlay gameData={gameData!} colors={colors} />
         </div>
       )}
 
       {panel === 'advice' && (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 h-full">
           {/* ── Mode Replay : afficher les événements de review ── */}
           {isReplayMode && reviewEvent && (
             <ReviewEventOverlay
@@ -332,8 +365,13 @@ export default function OverlayApp() {
                 />
               )}
 
+              {/* Matchup Briefing (début de partie) */}
+              {!currentAdvice && !alert && !adviceMinimized && matchupBriefing && (
+                <MatchupBriefingCard data={matchupBriefing} colors={colors} />
+              )}
+
               {/* Alerte niveau matchup */}
-              {!currentAdvice && !alert && !adviceMinimized && inGame && gameData!.matchup && gameData!.matchup.levelDiff !== 0 && (
+              {!currentAdvice && !alert && !adviceMinimized && !matchupBriefing && inGame && gameData!.matchup && gameData!.matchup.levelDiff !== 0 && (
                 <LevelAlert gameData={gameData!} colors={colors} />
               )}
             </>
@@ -342,23 +380,33 @@ export default function OverlayApp() {
       )}
 
       {panel === 'build' && buildData && (
-        <BuildStrip build={buildData.myBuild} colors={colors} />
+        <div className="overlay-glass clip-bevel h-full">
+          <BuildStrip build={buildData.myBuild} colors={colors} />
+        </div>
       )}
 
       {panel === 'style' && (
-        <StyleSwitcher selectedStyle={selectedStyle} />
+        <div className="overlay-glass clip-bevel h-full">
+          <StyleSwitcher selectedStyle={selectedStyle} />
+        </div>
+      )}
+
+      {panel === 'wincondition' && winCondition && (
+        <div className="overlay-glass clip-bevel h-full">
+          <WinConditionOverlay data={winCondition} colors={colors} />
+        </div>
       )}
 
       {/* Message d'attente si pas encore en jeu */}
       {!inGame && panel !== 'advice' && panel !== 'style' && (
-        <div className="flex items-center justify-center h-full px-3">
+        <div className="flex items-center justify-center h-full px-3 overlay-glass clip-bevel">
           <span className="text-[10px] font-mono" style={{ color: `${colors.accent}50` }}>
             En attente de partie...
           </span>
         </div>
       )}
-      {panel === 'advice' && !currentAdvice && !alert && !(inGame && gameData?.matchup && gameData.matchup.levelDiff !== 0) && (
-        <div className="flex flex-col items-center justify-center h-full px-3 gap-1">
+      {panel === 'advice' && !currentAdvice && !alert && !matchupBriefing && !(inGame && gameData?.matchup && gameData.matchup.levelDiff !== 0) && (
+        <div className="flex flex-col items-center justify-center h-full px-3 gap-1 overlay-glass clip-bevel">
           <span className="text-[10px] font-mono" style={{ color: `${colors.accent}50` }}>
             {inGame ? 'Analyse en cours...' : 'En attente de partie...'}
           </span>

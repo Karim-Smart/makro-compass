@@ -49,19 +49,19 @@ export function AdviceOverlay({ advice, colors, queuePos, queueTotal, rotateKey,
 
   return (
     <div
-      className="w-80 rounded-xl overflow-hidden animate-slide-up"
+      className="w-80 clip-bevel overflow-hidden animate-slide-up"
       style={{
-        background: `rgba(8, 10, 18, 0.88)`,
-        border: `1px solid ${colors.border}`,
-        boxShadow: `0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px ${colors.accent}18`,
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
+        background: `rgba(1, 10, 19, 0.9)`,
+        border: `1px solid rgba(200, 155, 60, 0.2)`,
+        boxShadow: `0 8px 32px rgba(0,0,0,0.6), 0 0 12px rgba(200, 155, 60, 0.06)`,
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
       }}
     >
-      {/* Ligne d'accent en haut */}
+      {/* Ligne d'accent dorée en haut */}
       <div
         className="h-0.5 w-full"
-        style={{ background: `linear-gradient(90deg, ${colors.accent}, transparent)` }}
+        style={{ background: `linear-gradient(90deg, #C89B3C, ${colors.accent}60, transparent)` }}
       />
 
       <div className="px-4 py-3">
@@ -125,7 +125,7 @@ export function AdviceOverlay({ advice, colors, queuePos, queueTotal, rotateKey,
         </div>
 
         {/* Texte */}
-        <p className="text-sm leading-relaxed" style={{ color: colors.text }}>
+        <p style={{ color: colors.text, fontSize: 13, lineHeight: '1.55' }}>
           {advice.text}
         </p>
 
@@ -144,7 +144,7 @@ export function AdviceOverlay({ advice, colors, queuePos, queueTotal, rotateKey,
         {/* Barre de décompte 30s */}
         <div
           className="h-px mt-2 rounded-full overflow-hidden"
-          style={{ backgroundColor: `${colors.border}80` }}
+          style={{ backgroundColor: `${colors.accent}20` }}
         >
           <div
             key={rotateKey}

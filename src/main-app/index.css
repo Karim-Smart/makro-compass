@@ -1,10 +1,26 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Hextech CSS Variables ─────────────────────────────────────────────────── */
+:root {
+  --hextech-gold: #C89B3C;
+  --hextech-gold-light: #F0E6D2;
+  --hextech-gold-dark: #785A28;
+  --hextech-void: #010A13;
+  --hextech-blue-1: #0A1628;
+  --hextech-blue-2: #0A323C;
+  --hextech-blue-3: #091428;
+  --hextech-silver: #A0A7B4;
+  --hextech-grey: #1E2328;
+}
+
 @layer base {
   html, body {
-    @apply bg-gray-950 text-gray-100 font-sans;
+    @apply text-gray-100 font-sans;
+    background: var(--hextech-void);
     margin: 0;
     padding: 0;
     height: 100%;
@@ -19,7 +35,7 @@
     flex-direction: column;
   }
 
-  /* Scrollbar fine et stylée */
+  /* Scrollbar dorée */
   ::-webkit-scrollbar {
     width: 4px;
     height: 4px;
@@ -28,18 +44,80 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(200, 155, 60, 0.25);
     border-radius: 2px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.22);
+    background: rgba(200, 155, 60, 0.45);
   }
 
-  /* Sélection de texte */
+  /* Sélection dorée */
   ::selection {
-    background: rgba(74, 159, 255, 0.3);
-    color: #fff;
+    background: rgba(200, 155, 60, 0.3);
+    color: #F0E6D2;
   }
+}
+
+/* ─── Clip-path biseautés (Hextech corners) ─────────────────────────────────── */
+
+.clip-bevel-sm {
+  clip-path: polygon(
+    4px 0%, calc(100% - 4px) 0%,
+    100% 4px, 100% calc(100% - 4px),
+    calc(100% - 4px) 100%, 4px 100%,
+    0% calc(100% - 4px), 0% 4px
+  );
+}
+
+.clip-bevel {
+  clip-path: polygon(
+    8px 0%, calc(100% - 8px) 0%,
+    100% 8px, 100% calc(100% - 8px),
+    calc(100% - 8px) 100%, 8px 100%,
+    0% calc(100% - 8px), 0% 8px
+  );
+}
+
+.clip-bevel-lg {
+  clip-path: polygon(
+    12px 0%, calc(100% - 12px) 0%,
+    100% 12px, 100% calc(100% - 12px),
+    calc(100% - 12px) 100%, 12px 100%,
+    0% calc(100% - 12px), 0% 12px
+  );
+}
+
+.clip-hex {
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+
+/* ─── Hextech composants ────────────────────────────────────────────────────── */
+
+.hextech-card {
+  position: relative;
+  background: var(--hextech-blue-1);
+}
+
+.hextech-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  clip-path: inherit;
+  background: linear-gradient(135deg, rgba(200, 155, 60, 0.15), transparent 60%);
+  pointer-events: none;
+}
+
+.hextech-glow {
+  box-shadow: 0 0 15px rgba(200, 155, 60, 0.08), inset 0 1px 0 rgba(200, 155, 60, 0.1);
+}
+
+.hextech-border {
+  background: linear-gradient(135deg, var(--hextech-gold-dark), rgba(200, 155, 60, 0.2));
+  padding: 1px;
+}
+
+.hextech-border > * {
+  background: var(--hextech-blue-1);
 }
 
 /* Range slider custom */

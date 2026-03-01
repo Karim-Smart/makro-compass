@@ -1,5 +1,5 @@
 import { app, globalShortcut } from 'electron'
-import { createMainWindow, createOverlayWindows, getOverlayWindows } from './windowManager'
+import { createMainWindow, createOverlayWindows } from './windowManager'
 import { setupIpcHandlers, stopAllAgents } from './ipcHandlers'
 import { setupTray } from './trayManager'
 
@@ -15,21 +15,9 @@ app.whenReady().then(async () => {
   const mainWindow = createMainWindow()
   const overlayWindows = createOverlayWindows()
 
-  setupIpcHandlers(mainWindow, overlayWindows)
-  setupTray(mainWindow)
-
-  // Hotkey global F9 : afficher/masquer les overlays
-  globalShortcut.register('F9', () => {
-    const windows = getOverlayWindows()
-    if (windows.length === 0) return
-
-    // Toggle basé sur le premier overlay
-    const shouldHide = windows[0].isVisible()
-    for (const win of windows) {
-      if (shouldHide) win.hide()
-      else win.show()
-    }
-  })
+  // setupIpcHandlers enregistre le hotkey depuis les settings persistés
+  const initialSettings = setupIpcHandlers(mainWindow, overlayWindows)
+  setupTray(mainWindow, initialSettings.hotkey ?? 'F9')
 })
 
 app.on('window-all-closed', () => {

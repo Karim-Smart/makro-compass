@@ -8,21 +8,65 @@ export const POLL_INTERVAL_MS = 5_000   // 5 secondes
 // Règles de quota par tier
 export const QUOTA_RULES = {
   free: {
-    maxPerDay: null,            // Illimité pour les tests
-    cooldownSeconds: 30,        // Un conseil toutes les 30s
-    adviceAfterMinutes: 1       // Premier conseil dès 1 minute de jeu
+    maxPerDay: 5,
+    cooldownSeconds: 60,
+    adviceAfterMinutes: 2,
   },
   pro: {
-    maxPerDay: 15,
-    cooldownSeconds: 90,
-    adviceAfterMinutes: 3
+    maxPerDay: 25,
+    cooldownSeconds: 30,
+    adviceAfterMinutes: 1,
   },
   elite: {
     maxPerDay: null,            // Illimité
-    cooldownSeconds: 45,
-    adviceAfterMinutes: 2
+    cooldownSeconds: 25,
+    adviceAfterMinutes: 1,
   }
 } as const
+
+// Pricing des tiers
+export const TIER_PRICING = {
+  free: 0,
+  pro: 9.99,
+  elite: 19.99,
+} as const
+
+// Labels affichés dans l'UI
+export const TIER_LABELS = {
+  free: 'Découverte',
+  pro: 'Compétiteur',
+  elite: 'Champion',
+} as const
+
+// Flag dev : contourner les appels API Anthropic (mock data)
+// En mode dev (NODE_ENV !== 'production'), toujours actif sauf si DEV_MOCK_AI=false
+// Utilise try/catch car `process` n'existe pas dans le renderer (navigateur)
+export const DEV_MOCK_AI: boolean = (() => {
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      // Explicitement désactivé → false
+      if (process.env.DEV_MOCK_AI === 'false') return false
+      // Mode dev → true par défaut (pas besoin de clé API)
+      if (process.env.NODE_ENV !== 'production') return true
+      // Explicitement activé en prod
+      return process.env.DEV_MOCK_AI === 'true'
+    }
+  } catch { /* renderer: pas de process */ }
+  return false
+})()
+
+// Tier simulé en dev : 'elite' pour débloquer toutes les features IA
+// Mettre à null pour utiliser le vrai backend, ou 'pro'/'free' pour tester le gating
+export const DEV_OVERRIDE_TIER: import('./types').SubscriptionTier | null = (() => {
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      const override = process.env.DEV_TIER
+      if (override === 'free' || override === 'pro' || override === 'elite') return override
+      if (process.env.NODE_ENV !== 'production') return 'elite'
+    }
+  } catch { /* renderer */ }
+  return null
+})()
 
 // Styles de coaching
 export const COACHING_STYLES = {

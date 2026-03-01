@@ -4,7 +4,7 @@ import { getOverlayWindows } from './windowManager'
 
 let tray: Tray | null = null
 
-export function setupTray(mainWindow: BrowserWindow): void {
+export function setupTray(mainWindow: BrowserWindow, hotkey = 'F9'): void {
   const iconPath = join(__dirname, '../../resources/tray-icon.png')
   let trayIcon: Electron.NativeImage
 
@@ -26,7 +26,7 @@ export function setupTray(mainWindow: BrowserWindow): void {
       }
     },
     {
-      label: 'Afficher/Masquer overlay (F9)',
+      label: `Afficher/Masquer overlay (${hotkey})`,
       click: () => {
         const windows = getOverlayWindows()
         if (windows.length === 0) return

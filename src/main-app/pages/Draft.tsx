@@ -1,11 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
 import { useDraftStore } from '../stores/draftStore'
+import { useCoachingStore } from '../stores/coachingStore'
 import { ROLE_POOL, CHAMPION_RUNES, CHAMPION_COUNTERS, CHAMPION_SYNERGIES, getSynergyScore, deduceEnemyRoles, generateMatchupAnalysis, generateLockReaction } from '../../../shared/draft-data'
 import type { MatchupAnalysis } from '../../../shared/draft-data'
 import { CHAMPIONS, getChampion } from '../../../shared/champion-data'
 import { getChampionLoadingUrl } from '../../../shared/champion-images'
 import { getMatchupWinrate } from '../../../shared/matchup-winrates'
+import { COACHING_STYLES } from '../../../shared/constants'
 import type { PlayerRole, ChampionRecommendation } from '../../../shared/types'
+import DraftOraclePanel from '../components/DraftOraclePanel'
 
 const ROLES: { key: PlayerRole; label: string; icon: string }[] = [
   { key: 'TOP',     label: 'Top',     icon: '⚔️' },
@@ -29,6 +32,8 @@ export default function Draft() {
     role, setRole, allyPicks, setAllyPick, enemyPicks, setEnemyPick, clearAll,
     recommendations, compTips, lcuConnected,
   } = useDraftStore()
+  const selectedStyle = useCoachingStore((s) => s.selectedStyle)
+  const styleColors = COACHING_STYLES[selectedStyle].colors
 
   const [inspected, setInspected] = useState<string | null>(null)
   const [matchup, setMatchup] = useState<MatchupAnalysis | null>(null)
@@ -112,7 +117,7 @@ export default function Draft() {
             <button
               key={r.key}
               onClick={() => setRole(r.key)}
-              className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all"
+              className="flex flex-col items-center gap-1 px-3 py-2 clip-bevel transition-all"
               style={{
                 backgroundColor: role === r.key ? '#7c3aed20' : '#ffffff08',
                 border: `1px solid ${role === r.key ? '#7c3aed' : '#ffffff15'}`,
@@ -223,7 +228,7 @@ export default function Draft() {
             {compTips.map((tip, i) => (
               <div
                 key={i}
-                className="text-xs px-3 py-2 rounded-lg"
+                className="text-xs px-3 py-2 clip-bevel"
                 style={{ backgroundColor: '#f59e0b10', border: '1px solid #f59e0b30', color: '#fcd34d' }}
               >
                 {tip}
@@ -235,6 +240,25 @@ export default function Draft() {
 
       {/* Rune lookup for any champion */}
       <RuneLookup role={role} />
+
+      {/* AI Draft Oracle */}
+      <DraftOraclePanel
+        myTeam={ROLES.map((r, i) => ({
+          championId: 0,
+          championName: allyPicks[i] ?? '',
+          assignedPosition: r.key,
+          completed: !!allyPicks[i],
+        }))}
+        theirTeam={ROLES.map((r, i) => ({
+          championId: 0,
+          championName: enemyPicks[i] ?? '',
+          assignedPosition: r.key,
+          completed: !!enemyPicks[i],
+        }))}
+        assignedPosition={role}
+        style={selectedStyle}
+        colors={styleColors}
+      />
 
       {/* Empty state */}
       {recommendations.length === 0 && !inspected && enemyPicks.every((p) => !p) && allyPicks.every((p) => !p) && (
@@ -296,7 +320,7 @@ function ChampionInput({
         onDragStart={(e) => { value && startDrag(e, value); setShowTooltip(false) }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className="w-9 h-9 rounded-full mb-1 overflow-hidden flex-shrink-0"
+        className="w-9 h-9 clip-hex mb-1 overflow-hidden flex-shrink-0"
         style={{
           border: value ? `2px solid ${accent}80` : '2px solid #ffffff10',
           backgroundColor: '#ffffff08',
@@ -340,13 +364,13 @@ function ChampionInput({
         }}
         onFocus={() => setShowSuggestions(true)}
         onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-        className="w-full text-xs px-2 py-1.5 rounded-lg bg-white/5 border text-white placeholder-gray-600 outline-none transition-colors text-center"
+        className="w-full text-xs px-2 py-1.5 clip-bevel bg-white/5 border text-white placeholder-gray-600 outline-none transition-colors text-center"
         style={{ borderColor: value ? `${accent}60` : '#ffffff15' }}
       />
 
       {/* Suggestions dropdown */}
       {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute z-50 top-full mt-1 w-full bg-gray-900 border border-white/10 rounded-lg shadow-xl overflow-hidden">
+        <div className="absolute z-50 top-full mt-1 w-full bg-gray-900 border border-white/10 clip-bevel shadow-xl overflow-hidden">
           {suggestions.map((champ) => {
             const info = CHAMPIONS[champ]
             const suggImgUrl = getChampionLoadingUrl(champ)
@@ -359,7 +383,7 @@ function ChampionInput({
                 <img
                   src={suggImgUrl}
                   alt={champ}
-                  className="w-5 h-5 rounded-full object-cover object-top flex-shrink-0"
+                  className="w-5 h-5 clip-hex object-cover object-top flex-shrink-0"
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                 />
                 <span className="text-white font-medium truncate">{champ}</span>
@@ -456,7 +480,7 @@ function EnemyRoleSlot({
         onDragStart={handleDragStart}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className="w-9 h-9 rounded-full mb-1 overflow-hidden flex-shrink-0 transition-all"
+        className="w-9 h-9 clip-hex mb-1 overflow-hidden flex-shrink-0 transition-all"
         style={{
           border: dragOver ? '2px solid #7c3aed' : pick ? '2px solid #ef444480' : '2px solid #ffffff10',
           backgroundColor: dragOver ? '#7c3aed15' : '#ffffff08',
@@ -496,13 +520,13 @@ function EnemyRoleSlot({
         }}
         onFocus={() => setShowSuggestions(true)}
         onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-        className="w-full text-xs px-2 py-1.5 rounded-lg bg-white/5 border text-white placeholder-gray-600 outline-none transition-colors text-center"
+        className="w-full text-xs px-2 py-1.5 clip-bevel bg-white/5 border text-white placeholder-gray-600 outline-none transition-colors text-center"
         style={{ borderColor: pick ? '#ef444460' : '#ffffff15' }}
       />
 
       {/* Suggestions dropdown */}
       {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute z-50 top-full mt-1 w-full bg-gray-900 border border-white/10 rounded-lg shadow-xl overflow-hidden">
+        <div className="absolute z-50 top-full mt-1 w-full bg-gray-900 border border-white/10 clip-bevel shadow-xl overflow-hidden">
           {suggestions.map((champ) => {
             const info = CHAMPIONS[champ]
             const suggImgUrl = getChampionLoadingUrl(champ)
@@ -515,7 +539,7 @@ function EnemyRoleSlot({
                 <img
                   src={suggImgUrl}
                   alt={champ}
-                  className="w-5 h-5 rounded-full object-cover object-top flex-shrink-0"
+                  className="w-5 h-5 clip-hex object-cover object-top flex-shrink-0"
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                 />
                 <span className="text-white font-medium truncate">{champ}</span>
@@ -570,7 +594,7 @@ function ChampionHoverTooltip({
 
   return (
     <div
-      className="absolute z-[60] w-72 rounded-xl shadow-2xl overflow-hidden"
+      className="absolute z-[60] w-72 clip-bevel-lg shadow-2xl overflow-hidden"
       style={{
         top: '-8px',
         left: '50%',
@@ -585,7 +609,7 @@ function ChampionHoverTooltip({
         <img
           src={imgUrl}
           alt={champion}
-          className="w-10 h-10 rounded-lg object-cover object-top flex-shrink-0"
+          className="w-10 h-10 clip-hex object-cover object-top flex-shrink-0"
           style={{ border: '2px solid #7c3aed50' }}
           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
         />
@@ -784,7 +808,7 @@ function LaneMatchups({
           return (
             <div
               key={role.key}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg"
+              className="flex items-center gap-2 px-3 py-2 clip-bevel"
               style={{ backgroundColor: '#ffffff06', border: '1px solid #ffffff08' }}
             >
               {/* Role */}
@@ -797,7 +821,7 @@ function LaneMatchups({
                 <img
                   src={allyImgUrl}
                   alt={ally}
-                  className="w-6 h-6 rounded-full object-cover object-top flex-shrink-0"
+                  className="w-6 h-6 clip-hex object-cover object-top flex-shrink-0"
                   style={{ border: '1.5px solid #22c55e50' }}
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                 />
@@ -839,7 +863,7 @@ function LaneMatchups({
                 <img
                   src={enemyImgUrl}
                   alt={enemy}
-                  className="w-6 h-6 rounded-full object-cover object-top flex-shrink-0"
+                  className="w-6 h-6 clip-hex object-cover object-top flex-shrink-0"
                   style={{ border: '1.5px solid #ef444450' }}
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                 />
@@ -889,14 +913,14 @@ function MatchupDropZone({
         onDragEnter={() => setHovering(true)}
         onDragLeave={() => setHovering(false)}
         onDrop={handleDrop}
-        className="flex flex-col items-center justify-center py-4 rounded-xl transition-all"
+        className="flex flex-col items-center justify-center py-4 clip-bevel-lg transition-all"
         style={{
           border: `2px dashed ${hovering ? '#7c3aed' : '#ffffff15'}`,
           backgroundColor: hovering ? '#7c3aed10' : 'transparent',
         }}
       >
         <div
-          className="w-14 h-14 rounded-full flex items-center justify-center transition-all"
+          className="w-14 h-14 clip-hex flex items-center justify-center transition-all"
           style={{
             border: `2px dashed ${hovering ? '#7c3aed' : '#ffffff20'}`,
             backgroundColor: hovering ? '#7c3aed15' : '#ffffff05',
@@ -925,7 +949,7 @@ function MatchupDropZone({
     <div
       onDragOver={handleDragOver}
       onDrop={handleDrop}
-      className="rounded-xl overflow-hidden"
+      className="clip-bevel-lg overflow-hidden"
       style={{ border: `1px solid ${adv.border}`, backgroundColor: '#0d0b1e' }}
     >
       {/* Header */}
@@ -933,7 +957,7 @@ function MatchupDropZone({
         <img
           src={imgUrl}
           alt={champion}
-          className="w-12 h-12 rounded-lg object-cover object-top flex-shrink-0"
+          className="w-12 h-12 clip-hex object-cover object-top flex-shrink-0"
           style={{ border: `2px solid ${adv.border}` }}
           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
         />
@@ -949,7 +973,7 @@ function MatchupDropZone({
           </div>
           <div className="flex items-center gap-2 mt-1">
             <span
-              className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full inline-block"
+              className="text-[9px] font-bold uppercase px-2 py-0.5 clip-bevel-sm inline-block"
               style={{ backgroundColor: adv.bg, color: adv.text, border: `1px solid ${adv.border}` }}
             >
               {adv.label}
@@ -1000,13 +1024,13 @@ function ChampionChip({ name, color }: { name: string; color: string }) {
   const imgUrl = getChampionLoadingUrl(name)
   return (
     <span
-      className="text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1"
+      className="text-[10px] px-2 py-0.5 clip-bevel-sm flex items-center gap-1"
       style={{ backgroundColor: `${color}12`, color: `${color}cc`, border: `1px solid ${color}30` }}
     >
       <img
         src={imgUrl}
         alt={name}
-        className="w-3.5 h-3.5 rounded-full object-cover object-top"
+        className="w-3.5 h-3.5 clip-hex object-cover object-top"
         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
       />
       {name}
@@ -1027,14 +1051,14 @@ function LockReactionBanner({ champion, text }: { champion: string; text: string
 
   return (
     <div
-      className="rounded-xl overflow-hidden"
+      className="clip-bevel-lg overflow-hidden"
       style={{ border: `1px solid ${dangerColors.border}`, backgroundColor: dangerColors.bg }}
     >
       <div className="flex items-start gap-3 p-3">
         <img
           src={imgUrl}
           alt={champion}
-          className="w-10 h-10 rounded-lg object-cover object-top flex-shrink-0"
+          className="w-10 h-10 clip-hex object-cover object-top flex-shrink-0"
           style={{ border: `2px solid ${dangerColors.border}` }}
           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
         />
@@ -1053,6 +1077,19 @@ function LockReactionBanner({ champion, text }: { champion: string; text: string
 
 // ─── Liste fixe de recommandations ──────────────────────────────────────────
 
+function scoreColor(score: number): string {
+  if (score >= 75) return '#22c55e'
+  if (score >= 50) return '#f59e0b'
+  return '#ef4444'
+}
+
+function scoreLabel(score: number): string {
+  if (score >= 80) return 'EXCELLENT'
+  if (score >= 65) return 'BON PICK'
+  if (score >= 50) return 'VIABLE'
+  return 'RISQUÉ'
+}
+
 function RecommendationList({
   recommendations,
   role,
@@ -1070,16 +1107,19 @@ function RecommendationList({
       <div className="flex flex-col gap-2">
         {recommendations.map((rec, i) => {
           const imgUrl = getChampionLoadingUrl(rec.champion)
+          const sColor = scoreColor(rec.score)
+          const isTop = i === 0
           return (
             <div
               key={rec.champion}
               draggable
               onDragStart={(e) => startDrag(e, rec.champion)}
-              className="flex items-start gap-3 px-3 py-2.5 rounded-xl transition-all hover:bg-white/5"
+              className="flex items-start gap-3 px-3 py-2.5 clip-bevel-lg transition-all hover:bg-white/5"
               style={{
-                border: '1px solid #7c3aed25',
-                backgroundColor: i === 0 ? '#7c3aed08' : 'transparent',
+                border: isTop ? `1px solid ${sColor}40` : '1px solid #7c3aed25',
+                backgroundColor: isTop ? `${sColor}08` : 'transparent',
                 cursor: 'grab',
+                boxShadow: isTop ? `0 0 16px ${sColor}10` : 'none',
               }}
             >
               {/* Rang + portrait */}
@@ -1087,12 +1127,12 @@ function RecommendationList({
                 <img
                   src={imgUrl}
                   alt={rec.champion}
-                  className="w-10 h-10 rounded-lg object-cover object-top"
+                  className="w-10 h-10 clip-hex object-cover object-top"
                   style={{ border: `2px solid ${medalColors[i]}40` }}
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                 />
                 <div
-                  className="absolute -top-1 -left-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black"
+                  className="absolute -top-1 -left-1 w-4 h-4 clip-bevel-sm flex items-center justify-center text-[9px] font-black"
                   style={{ backgroundColor: '#0d0b1e', border: `1.5px solid ${medalColors[i]}`, color: medalColors[i] }}
                 >
                   {i + 1}
@@ -1101,16 +1141,34 @@ function RecommendationList({
 
               {/* Infos */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-bold text-white">{rec.champion}</span>
+                  {/* Score badge avec label contextuel */}
                   <span
-                    className="text-[10px] font-bold px-1.5 py-px rounded-full flex-shrink-0"
-                    style={{ backgroundColor: '#7c3aed20', color: '#c4b5fd' }}
+                    className="text-[9px] font-black px-2 py-0.5 rounded tracking-wider flex-shrink-0"
+                    style={{ backgroundColor: `${sColor}20`, color: sColor, border: `1px solid ${sColor}40` }}
                   >
-                    +{rec.score}
+                    {scoreLabel(rec.score)}
                   </span>
                 </div>
-                <p className="text-[10px] text-gray-400 leading-relaxed mt-0.5">
+
+                {/* Barre de score 0-100 */}
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div
+                    className="flex-1 h-1.5 rounded-full overflow-hidden"
+                    style={{ backgroundColor: '#ffffff10' }}
+                  >
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(100, rec.score)}%`, backgroundColor: sColor }}
+                    />
+                  </div>
+                  <span className="text-[10px] font-mono font-black flex-shrink-0" style={{ color: sColor }}>
+                    {rec.score}
+                  </span>
+                </div>
+
+                <p className="text-[10px] text-gray-400 leading-relaxed">
                   {rec.detailedReason}
                 </p>
                 <div className="flex flex-wrap gap-1 mt-1.5">
@@ -1168,14 +1226,14 @@ function RuneLookup({ role }: { role: PlayerRole }) {
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder={`Chercher un champion ${role}...`}
-        className="w-full text-xs px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-600 outline-none focus:border-violet-500 transition-colors"
+        className="w-full text-xs px-3 py-2 clip-bevel bg-white/5 border border-white/10 text-white placeholder-gray-600 outline-none focus:border-violet-500 transition-colors"
       />
       {match && runes && (
-        <div className="mt-2 px-3 py-2.5 rounded-lg flex items-center gap-3" style={{ backgroundColor: '#ffffff06', border: '1px solid #ffffff10' }}>
+        <div className="mt-2 px-3 py-2.5 clip-bevel flex items-center gap-3" style={{ backgroundColor: '#ffffff06', border: '1px solid #ffffff10' }}>
           <img
             src={imgUrl}
             alt={match}
-            className="w-10 h-10 rounded-full object-cover object-top flex-shrink-0"
+            className="w-10 h-10 clip-hex object-cover object-top flex-shrink-0"
             style={{ border: '2px solid #7c3aed40' }}
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
           />

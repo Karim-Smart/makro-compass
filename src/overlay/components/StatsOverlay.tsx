@@ -69,13 +69,13 @@ export function StatsOverlay({ gameData, colors }: Props) {
     },
   ]
 
+  const matchup = gameData.matchup
+
   return (
     <div
-      className="rounded-xl overflow-hidden animate-fade-in"
+      className="overflow-hidden animate-fade-in"
       style={{
-        background: 'rgba(8, 10, 18, 0.85)',
-        border: `1px solid ${colors.border}`,
-        boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+        background: 'transparent',
       }}
     >
       <div className="flex">
@@ -97,6 +97,51 @@ export function StatsOverlay({ gameData, colors }: Props) {
           </div>
         ))}
       </div>
+
+      {/* Rangée matchup adversaire */}
+      {matchup && (
+        <>
+          <div style={{ height: 1, backgroundColor: `${colors.accent}15` }} />
+          <div className="flex">
+            {matchup.isDead ? (
+              <div className="flex-1 px-3 py-1 text-center">
+                <span className="text-[8px] font-mono animate-pulse" style={{ color: '#ef4444' }}>
+                  💀 {matchup.champion} — {Math.round(matchup.respawnTimer)}s
+                </span>
+              </div>
+            ) : (
+              <>
+                <div className="px-3 py-1 text-center flex-1">
+                  <div className="text-[8px] font-mono font-bold leading-none" style={{ color: '#ef4444' }}>
+                    vs {matchup.champion}
+                  </div>
+                  <div className="text-[7px] font-mono mt-0.5" style={{ color: '#ef444480' }}>
+                    {matchup.levelDiff > 0 ? `⬆+${matchup.levelDiff}` : matchup.levelDiff < 0 ? `⬇${matchup.levelDiff}` : '≈'} niv
+                  </div>
+                </div>
+                <div
+                  className="px-3 py-1 text-center flex-1"
+                  style={{ borderLeft: `1px solid ${colors.border}30` }}
+                >
+                  <div className="text-[8px] font-mono font-bold leading-none" style={{ color: '#ef4444' }}>
+                    {matchup.oppKda.kills}/{matchup.oppKda.deaths}/{matchup.oppKda.assists}
+                  </div>
+                  <div className="text-[7px] font-mono mt-0.5" style={{ color: '#ef444480' }}>KDA</div>
+                </div>
+                <div
+                  className="px-3 py-1 text-center flex-1"
+                  style={{ borderLeft: `1px solid ${colors.border}30` }}
+                >
+                  <div className="text-[8px] font-mono font-bold leading-none" style={{ color: '#ef4444' }}>
+                    {matchup.oppCs}
+                  </div>
+                  <div className="text-[7px] font-mono mt-0.5" style={{ color: '#ef444480' }}>CS</div>
+                </div>
+              </>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }

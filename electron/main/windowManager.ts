@@ -1,28 +1,39 @@
 import { BrowserWindow, screen, shell } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
-import type { OverlayPanels } from '../../shared/types'
+import type { OverlayPanels, SubscriptionTier } from '../../shared/types'
+import { canAccess } from '../../shared/feature-gates'
 
 let mainWindow: BrowserWindow | null = null
 
-// 5 fenêtres overlay indépendantes (opaques, draggables)
+// 6 fenêtres overlay indépendantes (opaques, draggables)
 let statsWindow: BrowserWindow | null = null
 let timersWindow: BrowserWindow | null = null
 let adviceWindow: BrowserWindow | null = null
 let styleWindow: BrowserWindow | null = null
 let buildWindow: BrowserWindow | null = null
+let winconditionWindow: BrowserWindow | null = null
 
-// Préférences de visibilité par panneau (par défaut tout activé)
+// Préférences de visibilité par panneau (par défaut tout activé sauf wincondition)
 let panelSettings: OverlayPanels = {
   stats: true,
   timers: true,
   advice: true,
   style: true,
   build: true,
+  wincondition: false,
 }
 
 // true quand l'overlay est globalement affiché (partie en cours)
 let overlayActive = false
+
+// Tier actuel pour le gating overlay
+let currentTier: SubscriptionTier = 'free'
+
+/** Met à jour le tier pour le gating overlay. */
+export function setOverlayTier(tier: SubscriptionTier): void {
+  currentTier = tier
+}
 
 const PRELOAD_MAIN = join(__dirname, '../preload/index.cjs')
 const PRELOAD_OVERLAY = join(__dirname, '../preload/overlay.cjs')
@@ -34,9 +45,10 @@ export function createMainWindow(): BrowserWindow {
     minWidth: 900,
     minHeight: 600,
     title: 'maKro Compass',
-    backgroundColor: '#0D1117',
-    frame: true,
+    backgroundColor: '#010A13',
+    frame: false,
     show: false,
+    icon: join(__dirname, '../../resources/icon.png'),
     webPreferences: {
       preload: PRELOAD_MAIN,
       contextIsolation: true,
@@ -92,13 +104,12 @@ function createPanelWindow(spec: OverlaySpec): BrowserWindow {
     x: spec.x,
     y: spec.y,
     frame: false,
-    transparent: false,
-    backgroundColor: '#080A12',
+    transparent: true,
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
-    hasShadow: true,
-    roundedCorners: true,
+    movable: false,
+    hasShadow: false,
     webPreferences: {
       preload: PRELOAD_OVERLAY,
       contextIsolation: true,
@@ -130,23 +141,23 @@ function createPanelWindow(spec: OverlaySpec): BrowserWindow {
 export function createOverlayWindows(): BrowserWindow[] {
   const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize
 
-  // Stats — haut gauche (plus large pour KDA + CS + Gold + timer)
+  // Stats — haut gauche (plus large pour KDA + CS + Gold + timer + matchup)
   statsWindow = createPanelWindow({
     panel: 'stats',
     width: 280,
-    height: 60,
+    height: 90,
     x: 10,
     y: 10,
   })
   statsWindow.on('closed', () => { statsWindow = null })
 
-  // Timers + Objectifs — bas gauche (plus haut pour objectifs enrichis)
+  // Timers — bas gauche
   timersWindow = createPanelWindow({
     panel: 'timers',
     width: 220,
-    height: 260,
+    height: 180,
     x: 10,
-    y: sh - 280,
+    y: sh - 200,
   })
   timersWindow.on('closed', () => { timersWindow = null })
 
@@ -180,7 +191,17 @@ export function createOverlayWindows(): BrowserWindow[] {
   })
   buildWindow.on('closed', () => { buildWindow = null })
 
-  return [statsWindow, timersWindow, adviceWindow, styleWindow, buildWindow]
+  // Win Condition — haut centre (Elite uniquement)
+  winconditionWindow = createPanelWindow({
+    panel: 'wincondition',
+    width: 280,
+    height: 80,
+    x: Math.round(sw / 2 - 140),
+    y: 10,
+  })
+  winconditionWindow.on('closed', () => { winconditionWindow = null })
+
+  return [statsWindow, timersWindow, adviceWindow, styleWindow, buildWindow, winconditionWindow]
 }
 
 // ─── Accesseurs ───────────────────────────────────────────────────────────────
@@ -190,7 +211,7 @@ export function getMainWindow(): BrowserWindow | null {
 }
 
 export function getOverlayWindows(): BrowserWindow[] {
-  return [statsWindow, timersWindow, adviceWindow, styleWindow, buildWindow].filter(
+  return [statsWindow, timersWindow, adviceWindow, styleWindow, buildWindow, winconditionWindow].filter(
     (w): w is BrowserWindow => w !== null && !w.isDestroyed()
   )
 }
@@ -203,6 +224,7 @@ function getPanelWindow(panel: keyof OverlayPanels): BrowserWindow | null {
     advice: adviceWindow,
     style: styleWindow,
     build: buildWindow,
+    wincondition: winconditionWindow,
   }
   return map[panel]
 }
@@ -224,11 +246,27 @@ export function setPanelSettings(panels: Partial<OverlayPanels>): void {
   }
 }
 
+// Map panneau → feature gatée (panneaux non listés = toujours accessibles)
+const PANEL_FEATURE_MAP: Partial<Record<keyof OverlayPanels, import('../../shared/feature-gates').GatedFeature>> = {
+  advice: 'overlay_advice',
+  build: 'overlay_build',
+  style: 'overlay_style',
+  wincondition: 'wincondition_tracker',
+}
+
 export function showOverlay(): void {
   overlayActive = true
   for (const key of Object.keys(panelSettings) as (keyof OverlayPanels)[]) {
     const win = getPanelWindow(key)
     if (!win || win.isDestroyed()) continue
+
+    // Gating : vérifier le tier avant d'afficher
+    const requiredFeature = PANEL_FEATURE_MAP[key]
+    if (requiredFeature && !canAccess(requiredFeature, currentTier)) {
+      win.hide()
+      continue
+    }
+
     if (panelSettings[key]) win.show()
     // les panneaux désactivés restent cachés
   }

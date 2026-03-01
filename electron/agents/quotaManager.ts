@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3'
 import { app } from 'electron'
 import { join } from 'path'
-import type { RankedQueueType, RankedGame, GameData } from '../../shared/types'
+import type { RankedQueueType, RankedGame, GameData, PostGameDebriefResponse, SmartRecap } from '../../shared/types'
 
 // ─── Initialisation SQLite ────────────────────────────────────────────────────
 
@@ -28,6 +28,24 @@ function getDb(): Database.Database {
       game_time INTEGER NOT NULL,
       priority TEXT NOT NULL DEFAULT 'medium',
       text TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS debrief_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      game_id INTEGER NOT NULL UNIQUE,
+      strengths TEXT NOT NULL,
+      improvements TEXT NOT NULL,
+      key_takeaway TEXT NOT NULL,
+      timestamp INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS smart_recap_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      game_id INTEGER NOT NULL UNIQUE,
+      headline TEXT NOT NULL,
+      mvp_moment TEXT NOT NULL,
+      grade TEXT NOT NULL,
+      timestamp INTEGER NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS ranked_games (
@@ -241,13 +259,17 @@ export function saveRankedGame(
       gameData.wardScore,
     )
 
+    // Pseudo game_id déterministe pour éviter les doublons si LCU importe aussi la même partie
+    const pseudoGameId = `live_${gameData.champion}_${Math.floor(gameData.gameTime)}_${gameData.kda.kills}${gameData.kda.deaths}${gameData.kda.assists}_${gameData.cs}`
+
     getDb().prepare(`
-      INSERT INTO ranked_games (
-        timestamp, queue_type, champion, kills, deaths, assists,
+      INSERT OR IGNORE INTO ranked_games (
+        game_id, timestamp, queue_type, champion, kills, deaths, assists,
         cs, gold, game_time, team_kills, enemy_kills,
         ward_score, level, items, allies, enemies, result, roast
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
+      pseudoGameId,
       Date.now(),
       queueType,
       gameData.champion,
@@ -383,5 +405,88 @@ export function getRankedHistory(queueType?: RankedQueueType): RankedGame[] {
   } catch (err) {
     console.error('[QuotaManager] Erreur lecture ranked:', (err as Error).message)
     return []
+  }
+}
+
+// ─── Debrief IA ─────────────────────────────────────────────────────────────
+
+/**
+ * Sauvegarde un debrief IA dans le cache SQLite.
+ */
+export function saveDebrief(gameId: number, debrief: PostGameDebriefResponse): void {
+  try {
+    getDb().prepare(`
+      INSERT OR REPLACE INTO debrief_log (game_id, strengths, improvements, key_takeaway, timestamp)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(
+      gameId,
+      JSON.stringify(debrief.strengths),
+      JSON.stringify(debrief.improvements),
+      debrief.keyTakeaway,
+      Date.now(),
+    )
+  } catch (err) {
+    console.error('[QuotaManager] Erreur sauvegarde debrief:', (err as Error).message)
+  }
+}
+
+/**
+ * Récupère un debrief IA depuis le cache SQLite.
+ * Retourne null si non trouvé.
+ */
+export function getDebrief(gameId: number): PostGameDebriefResponse | null {
+  try {
+    const row = getDb().prepare(
+      'SELECT strengths, improvements, key_takeaway FROM debrief_log WHERE game_id = ?'
+    ).get(gameId) as { strengths: string; improvements: string; key_takeaway: string } | undefined
+
+    if (!row) return null
+
+    return {
+      strengths: JSON.parse(row.strengths) as string[],
+      improvements: JSON.parse(row.improvements) as string[],
+      keyTakeaway: row.key_takeaway,
+    }
+  } catch (err) {
+    console.error('[QuotaManager] Erreur lecture debrief:', (err as Error).message)
+    return null
+  }
+}
+
+// ─── Smart Recap IA ─────────────────────────────────────────────────────────
+
+/**
+ * Sauvegarde un smart recap dans le cache SQLite.
+ */
+export function saveSmartRecap(gameId: number, recap: SmartRecap): void {
+  try {
+    getDb().prepare(`
+      INSERT OR REPLACE INTO smart_recap_log (game_id, headline, mvp_moment, grade, timestamp)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(gameId, recap.headline, recap.mvpMoment, recap.grade, Date.now())
+  } catch (err) {
+    console.error('[QuotaManager] Erreur sauvegarde smart recap:', (err as Error).message)
+  }
+}
+
+/**
+ * Récupère un smart recap depuis le cache SQLite.
+ */
+export function getSmartRecap(gameId: number): SmartRecap | null {
+  try {
+    const row = getDb().prepare(
+      'SELECT headline, mvp_moment, grade FROM smart_recap_log WHERE game_id = ?'
+    ).get(gameId) as { headline: string; mvp_moment: string; grade: string } | undefined
+
+    if (!row) return null
+
+    return {
+      headline: row.headline,
+      mvpMoment: row.mvp_moment,
+      grade: row.grade as SmartRecap['grade'],
+    }
+  } catch (err) {
+    console.error('[QuotaManager] Erreur lecture smart recap:', (err as Error).message)
+    return null
   }
 }

@@ -90,6 +90,8 @@ export interface GameData {
     position: string    // TOP, JUNGLE, MIDDLE, BOTTOM, UTILITY
     isDead: boolean
     respawnTimer: number // secondes avant respawn (0 si vivant)
+    oppKda: { kills: number; deaths: number; assists: number }
+    oppCs: number
   } | null
 }
 
@@ -147,11 +149,12 @@ export interface SubscriptionStatus {
 
 // Visibilité individuelle des panneaux overlay
 export interface OverlayPanels {
-  stats: boolean    // KDA, CS, gold, timer (haut-gauche)
-  timers: boolean   // Timers objectifs (bas-gauche)
-  advice: boolean   // Conseils macro (haut-droite)
-  style: boolean    // Switch de style LCK/LEC/… (droite)
-  build: boolean    // Build recommandé (droite)
+  stats: boolean        // KDA, CS, gold, timer (haut-gauche)
+  timers: boolean       // Timers objectifs (bas-gauche)
+  advice: boolean       // Conseils macro (haut-droite)
+  style: boolean        // Switch de style LCK/LEC/… (droite)
+  build: boolean        // Build recommandé (droite)
+  wincondition: boolean // Win condition tracker (haut-centre, Elite)
 }
 
 // Paramètres utilisateur
@@ -165,6 +168,38 @@ export interface UserSettings {
   overlayPanels: OverlayPanels
   voiceAlerts: boolean      // TTS des alertes (voix mexicaine)
   voiceVolume: number       // 0 à 1 (volume de la voix)
+  shotcallerMode: boolean   // Mode shotcaller directif (Elite)
+  customCoachTone: string   // Ton personnalisé du coach (Elite), ex: "agressif et hype"
+}
+
+// ─── AI Matchup Briefing (Pro+) ────────────────────────────────────────────
+
+export interface MatchupBriefingData {
+  summary: string              // Résumé court du matchup
+  powerSpikes: {
+    phase: 'early' | 'mid' | 'late'
+    advantage: 'you' | 'enemy' | 'even'
+    tip: string
+  }[]
+  dangerLevel: 'low' | 'medium' | 'high'
+  keyTip: string               // Conseil clé du matchup
+}
+
+// ─── AI Tilt Detector (Elite) ──────────────────────────────────────────────
+
+export interface TiltStatus {
+  tiltLevel: 'none' | 'mild' | 'moderate' | 'severe'
+  tiltScore: number            // 0-100
+  triggers: string[]           // raisons du tilt détecté
+  resetAdvice: string          // conseil de reset mental
+}
+
+// ─── AI Smart Recap (Pro+) ─────────────────────────────────────────────────
+
+export interface SmartRecap {
+  headline: string             // one-liner résumé ("Le raid baron à 25min change tout")
+  mvpMoment: string           // moment clé de la partie
+  grade: 'S' | 'A' | 'B' | 'C' | 'D'
 }
 
 // ─── Runes complètes ─────────────────────────────────────────────────────────
@@ -279,6 +314,44 @@ export interface ReviewTimeline {
   events: ReviewEvent[]       // triés par gameTimeStart
   summary: ReviewSummary
   gameId: number              // RankedGame.id associé
+}
+
+// ─── AI Draft Oracle (Pro+) ─────────────────────────────────────────────────
+
+export interface DraftOracleRequest {
+  myTeam: DraftPick[]
+  theirTeam: DraftPick[]
+  assignedPosition: string
+  style: CoachingStyle
+}
+
+export interface DraftSuggestion {
+  champion: string
+  reason: string
+  score: number  // 0-100
+}
+
+export interface DraftOracleResponse {
+  analysis: string
+  suggestions: DraftSuggestion[]
+  winConditions: string[]
+}
+
+// ─── AI Post-Game Debrief (Pro+) ────────────────────────────────────────────
+
+export interface PostGameDebriefResponse {
+  strengths: string[]      // 3 points forts
+  improvements: string[]   // 3 axes d'amélioration
+  keyTakeaway: string      // 1 conseil principal
+}
+
+// ─── AI Win Condition Tracker (Elite) ───────────────────────────────────────
+
+export interface WinConditionData {
+  winProbability: number   // 0-100
+  primaryCondition: string // ex: "Pression Baron avec avantage numérique"
+  nextAction: string       // ex: "Groupez bot pour drake soul"
+  trend: 'up' | 'stable' | 'down'
 }
 
 // Événement IPC générique

@@ -15,7 +15,7 @@ function ItemIcon({ item, colors, size = 48 }: { item: RecommendedItem; colors: 
       <img
         src={getItemIconUrl(item.itemId)}
         alt={item.name}
-        className="rounded"
+        className="clip-bevel-sm"
         style={{
           width: size,
           height: size,
@@ -44,7 +44,7 @@ export function BuildStrip({ build, colors }: BuildStripProps) {
   return (
     <div
       className="flex flex-col items-center gap-1 p-1 h-full"
-      style={{ background: colors.bg }}
+      style={{ background: 'transparent' }}
     >
       {allItems.map((item, idx) => (
         <ItemIcon key={idx} item={item} colors={colors} size={48} />

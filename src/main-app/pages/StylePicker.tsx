@@ -1,83 +1,184 @@
+import { useNavigate } from 'react-router-dom'
 import { useCoachingStore } from '../stores/coachingStore'
+import { useSubscriptionStore } from '../stores/subscriptionStore'
 import { StyleCard } from '../components/StyleCard'
-import { COACHING_STYLES } from '../../../shared/constants'
+import { COACHING_STYLES, TIER_LABELS } from '../../../shared/constants'
 import type { CoachingStyle } from '../../../shared/types'
+import { canAccess } from '../../../shared/feature-gates'
 
 const STYLES: CoachingStyle[] = ['LCK', 'LEC', 'LCS', 'LPL']
 
+// Philosophies enrichies par style
+const PHILOSOPHY: Record<CoachingStyle, { headline: string; pillars: string[] }> = {
+  LCK: {
+    headline: 'Contrôle parfait, zéro risque inutile',
+    pillars: ['Slow push + crash', 'Vision dominante', 'Objectifs avant kills', 'Split push calculé'],
+  },
+  LEC: {
+    headline: 'Snowball créatif, convertis chaque avantage',
+    pillars: ['Roaming créatif', 'Tempo rapide', 'Convertir kill → tour → objectif', 'Appât baron'],
+  },
+  LCS: {
+    headline: 'Teamfight groupé autour des objectifs',
+    pillars: ["Cohésion d'équipe", 'Setup complet avant baron', 'Peeling du carry', 'Adaptation au game state'],
+  },
+  LPL: {
+    headline: 'Pression maximale, ne laisse jamais respirer',
+    pillars: ['Invade level 1', 'Kill → push → objectif sans reset', 'Baron agressif 50/50', 'Jungle deny constant'],
+  },
+}
+
 export default function StylePicker() {
   const { selectedStyle, setStyle } = useCoachingStore()
+  const tier = useSubscriptionStore((s) => s.status?.tier ?? 'free')
+  const hasAllStyles = canAccess('all_coaching_styles', tier)
   const current = COACHING_STYLES[selectedStyle]
+  const phil = PHILOSOPHY[selectedStyle]
 
   return (
     <div className="h-full flex flex-col overflow-auto">
-      {/* En-tête hero */}
+
+      {/* ─── Hero ─── */}
       <div
-        className="relative px-8 pt-8 pb-6 overflow-hidden"
+        className="relative px-8 pt-7 pb-5 overflow-hidden flex-shrink-0"
         style={{
-          background: `linear-gradient(180deg, ${current.colors.border}30 0%, transparent 100%)`
+          background: `linear-gradient(180deg, ${current.colors.border}35 0%, transparent 100%)`
         }}
       >
-        {/* Ligne décorative gauche */}
         <div
           className="absolute left-0 top-0 bottom-0 w-1 rounded-r"
           style={{ backgroundColor: current.colors.accent }}
         />
-
-        <h1 className="text-3xl font-black text-white tracking-tight mb-1">
-          Choisis ta région
-        </h1>
-        <p className="text-sm opacity-50 text-white max-w-lg">
-          Chaque championnat a une philosophie de jeu unique.
-          Ton style détermine la façon dont l'IA te coache pendant la partie.
-        </p>
+        <div className="flex items-end justify-between">
+          <div>
+            <div className="text-[9px] font-black uppercase tracking-[0.25em] mb-1" style={{ color: current.colors.accent, opacity: 0.6 }}>
+              Style de coaching
+            </div>
+            <h1 className="text-2xl font-black text-white tracking-tight mb-1">
+              Choisis ta philosophie
+            </h1>
+            <p className="text-xs opacity-40 text-white max-w-md">
+              Chaque région a une approche macro unique. Ce style guide tous les conseils de l'overlay en partie.
+            </p>
+          </div>
+          {/* Style actif badge compact */}
+          <div
+            className="flex items-center gap-2 px-3 py-1.5 clip-bevel-sm flex-shrink-0"
+            style={{
+              backgroundColor: `${current.colors.accent}15`,
+              border: `1px solid ${current.colors.accent}40`,
+            }}
+          >
+            <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: current.colors.accent }} />
+            <span className="text-xs font-black" style={{ color: current.colors.accent }}>{current.name} actif</span>
+          </div>
+        </div>
       </div>
 
-      {/* Grille des cartes */}
-      <div className="flex-1 px-6 pb-6">
-        <div className="grid grid-cols-2 gap-4 max-w-3xl mx-auto">
-          {STYLES.map((style) => (
-            <StyleCard
-              key={style}
-              style={style}
-              isSelected={selectedStyle === style}
-              onSelect={setStyle}
-            />
-          ))}
+      {/* ─── Grille 2×2 ─── */}
+      <div className="flex-1 px-6 pb-4 overflow-auto">
+        <div className="grid grid-cols-2 gap-3 max-w-3xl mx-auto">
+          {STYLES.map((style) => {
+            const locked = !hasAllStyles && style !== 'LCK'
+            return (
+              <div key={style} className="relative">
+                <StyleCard
+                  style={style}
+                  isSelected={selectedStyle === style}
+                  onSelect={locked ? () => {} : setStyle}
+                />
+                {locked && (
+                  <div className="absolute inset-0 clip-bevel-lg flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <span
+                      className="px-3 py-1 clip-bevel-sm text-[10px] font-black uppercase tracking-wider"
+                      style={{ backgroundColor: '#9B6EF330', color: '#9B6EF3', border: '1px solid #9B6EF350' }}
+                    >
+                      {TIER_LABELS.pro} requis
+                    </span>
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
 
-        {/* Style actif résumé */}
+        {/* ─── Philosophie du style actif ─── */}
         <div
-          className="mt-5 max-w-3xl mx-auto rounded-xl px-5 py-4 flex items-center gap-4"
+          className="mt-4 max-w-3xl mx-auto clip-bevel-lg overflow-hidden"
           style={{
-            background: `linear-gradient(90deg, ${current.colors.bg} 0%, ${current.colors.border}40 100%)`,
-            border: `1px solid ${current.colors.border}`
+            border: `1px solid ${current.colors.border}`,
           }}
         >
-          <div className="text-2xl">{current.flag}</div>
-          <div className="flex-1">
-            <div className="text-xs uppercase tracking-widest opacity-50 mb-0.5" style={{ color: current.colors.text }}>
-              Style actif
+          {/* Header philosophie */}
+          <div
+            className="px-5 py-3 flex items-center justify-between"
+            style={{
+              background: `linear-gradient(90deg, ${current.colors.border}60 0%, transparent 100%)`,
+              borderBottom: `1px solid ${current.colors.border}50`,
+            }}
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="text-lg">{current.flag}</span>
+              <div>
+                <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: current.colors.text, opacity: 0.4 }}>
+                  Philosophie {current.name}
+                </div>
+                <div className="text-sm font-bold" style={{ color: current.colors.accent }}>
+                  {phil.headline}
+                </div>
+              </div>
             </div>
-            <div className="font-bold" style={{ color: current.colors.accent }}>
-              {current.name} — {current.label}
-            </div>
-            <div className="text-xs opacity-60 mt-0.5" style={{ color: current.colors.text }}>
-              {current.description}
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="flex gap-1 justify-end">
+            <div className="flex gap-1">
               {current.traits.map((t) => (
                 <span
                   key={t}
-                  className="text-[10px] px-1.5 py-0.5 rounded font-bold opacity-80"
-                  style={{ backgroundColor: `${current.colors.accent}25`, color: current.colors.accent }}
+                  className="text-[9px] px-2 py-0.5 rounded font-black uppercase tracking-wider"
+                  style={{ backgroundColor: `${current.colors.accent}20`, color: current.colors.accent }}
                 >
                   {t}
                 </span>
               ))}
             </div>
+          </div>
+
+          {/* Pilliers tactiques */}
+          <div
+            className="px-5 py-3 grid grid-cols-4 gap-3"
+            style={{ backgroundColor: `${current.colors.bg}80` }}
+          >
+            {phil.pillars.map((p, i) => (
+              <div key={i} className="flex items-start gap-1.5">
+                <div
+                  className="w-1 h-1 rounded-full mt-1.5 flex-shrink-0"
+                  style={{ backgroundColor: current.colors.accent }}
+                />
+                <span className="text-[10px] leading-relaxed" style={{ color: current.colors.text, opacity: 0.7 }}>
+                  {p}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Preview conseil overlay */}
+          <div
+            className="px-5 py-3 flex items-center gap-3"
+            style={{
+              borderTop: `1px solid ${current.colors.border}40`,
+              backgroundColor: `${current.colors.bg}60`,
+            }}
+          >
+            <div
+              className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest flex-shrink-0"
+              style={{ backgroundColor: `${current.colors.accent}20`, color: current.colors.accent }}
+            >
+              Aperçu overlay
+            </div>
+            <span
+              className="text-xs italic"
+              style={{ color: current.colors.text, opacity: 0.65 }}
+            >
+              "{current.previewAdvice}"
+            </span>
           </div>
         </div>
       </div>

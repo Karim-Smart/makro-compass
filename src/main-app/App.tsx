@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { HashRouter, Routes, Route, NavLink } from 'react-router-dom'
+import { HashRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom'
 import Dashboard from './pages/Dashboard'
 import StylePicker from './pages/StylePicker'
 import Draft from './pages/Draft'
@@ -7,6 +7,9 @@ import Settings from './pages/Settings'
 import Stats from './pages/Stats'
 import Runes from './pages/Runes'
 import Build from './pages/Build'
+import Profile from './pages/Profile'
+import Pricing from './pages/Pricing'
+import { TitleBar } from './components/TitleBar'
 import { initGameStoreIpc } from './stores/gameStore'
 import { initCoachingStoreIpc } from './stores/coachingStore'
 import { initSubscriptionStoreIpc } from './stores/subscriptionStore'
@@ -110,15 +113,39 @@ function IconBuild() {
   )
 }
 
+function IconUser() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+      className="w-3.5 h-3.5 flex-shrink-0">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  )
+}
+
+function IconCrown() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+      className="w-3.5 h-3.5 flex-shrink-0">
+      <path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z" />
+      <path d="M3 20h18" />
+    </svg>
+  )
+}
+
 // ─── Items de navigation ──────────────────────────────────────────────────────
 
 const NAV_ITEMS = [
-  { path: '/',          label: 'Région',     Icon: IconGlobe    },
-  { path: '/draft',     label: 'Draft',      Icon: IconSwords   },
+  { path: '/profile',   label: 'Profil',     Icon: IconUser     },
   { path: '/dashboard', label: 'Dashboard',  Icon: IconGrid     },
+  { path: '/draft',     label: 'Draft',      Icon: IconSwords   },
   { path: '/runes',     label: 'Runes',      Icon: IconRunes    },
   { path: '/build',     label: 'Build',      Icon: IconBuild    },
   { path: '/stats',     label: 'Classées',   Icon: IconBarChart },
+  { path: '/style',     label: 'Style',      Icon: IconGlobe    },
+  { path: '/pricing',   label: 'Plans',      Icon: IconCrown    },
   { path: '/settings',  label: 'Paramètres', Icon: IconGear     },
 ] as const
 
@@ -144,48 +171,43 @@ function App() {
 
   return (
     <HashRouter>
-      <div className="flex flex-col h-screen" style={{ backgroundColor: c.bg }}>
+      <div className="flex flex-col h-screen" style={{ backgroundColor: '#010A13' }}>
 
-        {/* ── Barre de navigation ── */}
+        {/* ── Title bar frameless ── */}
+        <TitleBar />
+
+        {/* ── Barre de navigation LoL ── */}
         <nav
-          className="flex items-center gap-1 px-3 py-2 flex-shrink-0"
+          className="flex items-center gap-0.5 px-3 py-0 flex-shrink-0"
           style={{
-            backgroundColor: `${c.bg}F0`,
-            borderBottom: `1px solid ${c.border}`,
-            backdropFilter: 'blur(8px)',
+            backgroundColor: 'var(--hextech-blue-3)',
+            borderBottom: '1px solid rgba(200, 155, 60, 0.2)',
           }}
         >
-          {/* Logo */}
-          <div className="flex items-center gap-2 mr-3 px-1" style={{ color: c.accent }}>
-            <IconCompass />
-            <span className="font-black text-sm tracking-tight">
-              ma<span style={{ color: c.accent }}>K</span>ro
-              <span className="font-medium opacity-60 ml-1 text-white">Compass</span>
-            </span>
-          </div>
-
-          {/* Séparateur vertical */}
-          <div className="h-4 w-px mr-2 opacity-20" style={{ backgroundColor: c.text }} />
-
           {/* Liens */}
           {NAV_ITEMS.map(({ path, label, Icon }) => (
             <NavLink
               key={path}
               to={path}
-              end={path === '/'}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold transition-all duration-150 relative"
               style={({ isActive }) => ({
-                color: isActive ? c.accent : c.text,
-                backgroundColor: isActive ? `${c.accent}18` : 'transparent',
-                opacity: isActive ? 1 : 0.55,
+                color: isActive ? 'var(--hextech-gold)' : 'var(--hextech-silver)',
+                opacity: isActive ? 1 : 0.6,
               })}
             >
               {({ isActive }) => (
                 <>
-                  <span style={{ color: isActive ? c.accent : 'currentColor' }}>
+                  <span style={{ color: isActive ? 'var(--hextech-gold)' : 'currentColor' }}>
                     <Icon />
                   </span>
                   {label}
+                  {/* Bordure basse dorée active */}
+                  {isActive && (
+                    <div
+                      className="absolute bottom-0 left-2 right-2 h-0.5"
+                      style={{ background: 'linear-gradient(90deg, transparent, var(--hextech-gold), transparent)' }}
+                    />
+                  )}
                 </>
               )}
             </NavLink>
@@ -195,12 +217,15 @@ function App() {
         {/* ── Contenu ── */}
         <main className="flex-1 overflow-hidden">
           <Routes>
-            <Route path="/"          element={<StylePicker />} />
+            <Route path="/"          element={<Navigate to="/dashboard" replace />} />
+            <Route path="/style"     element={<StylePicker />} />
+            <Route path="/profile"   element={<Profile />} />
             <Route path="/draft"     element={<Draft />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/runes"     element={<Runes />} />
             <Route path="/build"     element={<Build />} />
             <Route path="/stats"     element={<Stats />} />
+            <Route path="/pricing"   element={<Pricing />} />
             <Route path="/settings"  element={<Settings />} />
           </Routes>
         </main>

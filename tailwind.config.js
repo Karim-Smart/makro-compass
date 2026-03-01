@@ -7,6 +7,18 @@ export default {
   theme: {
     extend: {
       colors: {
+        // ─── Hextech (LoL) ───
+        hextech: {
+          gold: '#C89B3C',
+          'gold-light': '#F0E6D2',
+          'gold-dark': '#785A28',
+          'blue-void': '#010A13',
+          'blue-1': '#0A1628',
+          'blue-2': '#0A323C',
+          'blue-3': '#091428',
+          silver: '#A0A7B4',
+          'grey-dark': '#1E2328',
+        },
         // LCK — Coréen méthodique (bleu foncé)
         lck: {
           bg: '#0A1628',
@@ -38,7 +50,8 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace']
+        mono: ['JetBrains Mono', 'monospace'],
+        display: ['Cinzel', 'serif'],
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-in-out',

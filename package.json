@@ -11,7 +11,9 @@
     "build:win": "npm run build && electron-builder --win",
     "build:mac": "npm run build && electron-builder --mac",
     "build:linux": "npm run build && electron-builder --linux",
-    "gen:tray-icon": "node scripts/generate-tray-icon.cjs"
+    "gen:tray-icon": "node scripts/generate-tray-icon.cjs",
+    "gen:app-icon": "node scripts/generate-app-icon.cjs",
+    "rebuild:native": "HOME=~/.electron-gyp npx node-gyp rebuild --target=27.3.11 --arch=x64 --dist-url=https://electronjs.org/headers --directory=node_modules/better-sqlite3"
   },
   "keywords": [
     "electron",
@@ -30,7 +32,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "electron": "^27.3.11",
-    "electron-builder": "^24.13.3",
+    "electron-builder": "^26.8.1",
     "electron-vite": "^2.3.0",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.14",
@@ -57,8 +59,18 @@
     },
     "win": {
       "target": [
-        { "target": "nsis",     "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "resources/icon.ico"
     },

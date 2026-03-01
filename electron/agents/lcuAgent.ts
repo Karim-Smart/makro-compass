@@ -362,7 +362,7 @@ export async function importRecentRankedGames(count = 5): Promise<number> {
     // dans le corps de la réponse — pas besoin d'un appel séparé /lol-summoner
     const histResp = await lcuHttpClient.get(
       getLcuUrl(`/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=${count * 2 - 1}`),
-      { headers: getLcuHeaders(), timeout: 30_000 },
+      { headers: getLcuHeaders(), timeout: 15_000 },
     )
     const histData = histResp.data as {
       accountId: string             // accountId du joueur connecté
