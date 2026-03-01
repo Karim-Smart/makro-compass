@@ -395,6 +395,7 @@ async function poll(): Promise<void> {
           text: tip.text,
           style: currentStyle,
           priority: tip.priority,
+          category: tip.category,
           timestamp: Date.now(),
           gameTime: gameData.gameTime,
         })

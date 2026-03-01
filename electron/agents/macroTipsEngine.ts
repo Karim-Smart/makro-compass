@@ -30,6 +30,48 @@ let lastHeraldKillAt  = -1
 let lastTipText       = ''
 let rotationIdx       = 0
 
+// Tracker les 5 derniers tips pour éviter la répétition
+const recentTips: string[] = []
+
+// Cooldowns par catégorie : category → gameTime du dernier broadcast
+const categoryCooldowns: Record<string, number> = {}
+
+// Durées des cooldowns par catégorie (secondes de gameTime)
+const CATEGORY_CD: Record<string, number> = {
+  'cs':          120,   // CS feedback max 1 fois / 2 min
+  'ally':         90,   // ally tip max 1 fois / 1.5 min
+  'class-rule':   60,   // class matchup max 1 fois / 1 min
+  'phase':        45,   // tips de phase max 1 fois / 45s
+  'comp':         90,   // enemy comp max 1 fois / 1.5 min
+  'power-curve':  90,   // power curve max 1 fois / 1.5 min
+  'gold-diff':   120,   // gold diff max 1 fois / 2 min
+  'structural':  180,   // avance structurelle max 1 fois / 3 min
+}
+
+// ─── Helpers anti-répétition ──────────────────────────────────────────────
+
+function isRecentTip(text: string): boolean {
+  const prefix = text.slice(0, 25)
+  return recentTips.some(t => t.startsWith(prefix))
+}
+
+function addRecentTip(text: string): void {
+  recentTips.push(text)
+  if (recentTips.length > 5) recentTips.shift()
+}
+
+function isCategoryOnCooldown(category: string | undefined, gameTime: number): boolean {
+  if (!category) return false
+  const cd = CATEGORY_CD[category]
+  if (cd === undefined) return false
+  const last = categoryCooldowns[category] ?? -Infinity
+  return gameTime - last < cd
+}
+
+function markCategoryUsed(category: string | undefined, gameTime: number): void {
+  if (category) categoryCooldowns[category] = gameTime
+}
+
 // ─── Variantes de tips par style de coaching ─────────────────────────────────
 
 const STYLE_TIPS: Record<CoachingStyle, {
@@ -65,8 +107,8 @@ const STYLE_TIPS: Record<CoachingStyle, {
       'Ward défensivement, ne face-check jamais. Farm les vagues qui arrivent',
       'Tours perdues = danger. Joue groupé, évite les rotations solo',
     ],
-    plates: 'Plaques bientôt — slow push et crash pour maximiser le gold',
-    itemSpike: 'Spike de puissance — cherche un trade avantageux, pas un all-in risqué',
+    plates: 'Slow push et crash pour maximiser le gold',
+    itemSpike: 'Cherche un trade avantageux, pas un all-in risqué',
   },
   LEC: {
     killAhead: [
@@ -92,8 +134,8 @@ const STYLE_TIPS: Record<CoachingStyle, {
       'Perdu des tours mais le comeback EU c\'est ça — cherche le pick',
       'Map rétrécie, mais un bon roam peut tout renverser',
     ],
-    plates: 'Plaques avant 14 min ! Push agressif, chaque plaque = 160g de snowball',
-    itemSpike: 'Item complété = spike ! Force un play agressif, convertis en objectif',
+    plates: 'Push agressif, chaque plaque = 160g de snowball',
+    itemSpike: 'Force un play agressif, convertis en objectif',
   },
   LCS: {
     killAhead: [
@@ -119,8 +161,8 @@ const STYLE_TIPS: Record<CoachingStyle, {
       'Tours perdues — regroupe défensivement, ne splitte pas seul',
       'Défends en groupe, un bon teamfight sous tour peut tout changer',
     ],
-    plates: 'Plaques bientôt — groupe pour push et partager le gold d\'équipe',
-    itemSpike: 'Item spike — cherche un teamfight d\'équipe autour d\'un objectif',
+    plates: 'Groupe pour push et partager le gold d\'équipe',
+    itemSpike: 'Cherche un teamfight d\'équipe autour d\'un objectif',
   },
   LPL: {
     killAhead: [
@@ -146,8 +188,8 @@ const STYLE_TIPS: Record<CoachingStyle, {
       'Tours perdues mais l\'agression paie. Force les fights à tes conditions',
       'Map compressée = density. Catch les ennemis qui greed trop loin',
     ],
-    plates: 'Plaques = gold massif ! Dive si nécessaire, chaque plaque compte',
-    itemSpike: 'Item complété = ALL-IN. Force le fight immédiat, écrasse-les',
+    plates: 'Dive si nécessaire, chaque plaque compte',
+    itemSpike: 'Force le fight immédiat, écrasse-les',
   },
 }
 
@@ -167,44 +209,63 @@ export function resetMacroEngine(): void {
   lastHeraldKillAt = -1
   lastTipText      = ''
   rotationIdx      = 0
+  recentTips.length = 0
+  for (const k in categoryCooldowns) delete categoryCooldowns[k]
 }
 
 interface Tip {
   text: string
   priority: 'low' | 'medium' | 'high'
   weight: number
+  category?: string
 }
 
-export function generateMacroTip(gameData: GameData, style: CoachingStyle = 'LCK'): { text: string; priority: 'low' | 'medium' | 'high' } {
+export function generateMacroTip(
+  gameData: GameData,
+  style: CoachingStyle = 'LCK',
+): { text: string; priority: 'low' | 'medium' | 'high'; category?: string } {
   const tips: Tip[] = []
   const styleTips = STYLE_TIPS[style]
   const {
     gameTime, matchup, objectives, towers, teamKills, enemyKills,
-    champion, items, gameMode, cs, level, allies, enemies,
+    champion, items, gameMode, cs, allies, enemies,
+    teamGold, enemyGold,
   } = gameData
   const killDiff = teamKills - enemyKills
   const csPerMin = gameTime > 60 ? cs / (gameTime / 60) : 0
+  const goldDiff = teamGold - enemyGold
 
   // ─── CRITICAL (weight 100+) ────────────────────────────────────────
 
   if (objectives.elderActive) {
-    tips.push({ text: '🐲 ELDER ACTIF — force le teamfight MAINTENANT, exécute sous 20% HP', priority: 'high', weight: 150 })
+    tips.push({ text: '🐲 ELDER ACTIF — force le teamfight MAINTENANT, exécute sous 20% HP', priority: 'high', weight: 150, category: 'elder-active' })
   }
 
   if (objectives.baronActive) {
-    tips.push({ text: '👁 BARON BUFF — split 1-3-1, push 2 lanes en même temps, ne fight pas', priority: 'high', weight: 140 })
+    tips.push({ text: '👁 BARON BUFF — split 1-3-1, push 2 lanes en même temps, ne fight pas', priority: 'high', weight: 140, category: 'baron-buff' })
   }
 
   if (objectives.dragonStacks === 3) {
-    tips.push({ text: '🐉 SOUL POINT — prochain drake = Dragon Soul ! Setup vision bot 1 min avant', priority: 'high', weight: 130 })
+    tips.push({ text: '🐉 SOUL POINT — prochain drake = Dragon Soul ! Setup vision bot 1 min avant', priority: 'high', weight: 130, category: 'soul-point' })
   }
 
   if (objectives.enemyDragonStacks === 3) {
-    tips.push({ text: '⚠️ SOUL POINT ennemi — conteste le prochain drake ABSOLUMENT', priority: 'high', weight: 135 })
+    tips.push({ text: '⚠️ SOUL POINT ennemi — conteste le prochain drake ABSOLUMENT', priority: 'high', weight: 135, category: 'soul-point' })
   }
 
+  // Dragon soul type-specific tips
   if (objectives.dragonStacks >= 4 && objectives.dragonSoul) {
-    tips.push({ text: `🏆 Dragon Soul ${objectives.dragonSoul} obtenu — avantage permanent, force la pression`, priority: 'high', weight: 110 })
+    const soulType = objectives.dragonSoul
+    const soulTips: Record<string, string> = {
+      'Infernal':  '🐉 Soul Infernal — teamfight explosif, cherche l\'engage direct',
+      'Ocean':     '🐉 Soul Océan — tu régénères en combat, flanque et engage long',
+      'Mountain':  '🐉 Soul Montagne — tank les tours, dive les carrys',
+      'Cloud':     '🐉 Soul Nuage — kite les ennemis, joue mobile et espacé',
+      'Chemtech':  '🐉 Soul Chémtech — utilise la fenêtre de revie pour dive sans risque',
+      'Hextech':   '🐉 Soul Hextech — CC chain, engage sur leur carry en premier',
+    }
+    const soulText = soulTips[soulType] ?? `🏆 Dragon Soul ${soulType} — avantage permanent, force la pression`
+    tips.push({ text: soulText, priority: 'high', weight: 110, category: 'dragon-soul' })
   }
 
   // ─── OBJECTIVE COUNTDOWNS (weight 80-99) ───────────────────────────
@@ -215,19 +276,19 @@ export function generateMacroTip(gameData: GameData, style: CoachingStyle = 'LCK
     const cd = Math.floor(next - gameTime)
     const drakeTip = styleTips.drake[rotationIdx % styleTips.drake.length]
     if (cd > 0 && cd <= 30) {
-      tips.push({ text: `🐉 Drake dans ${cd}s ! ${drakeTip}`, priority: 'high', weight: 95 })
+      tips.push({ text: `🐉 Drake dans ${cd}s ! ${drakeTip}`, priority: 'high', weight: 95, category: 'drake-timer' })
     } else if (cd > 30 && cd <= 60) {
-      tips.push({ text: `🐉 Drake dans ${cd}s — ${drakeTip}`, priority: 'medium', weight: 85 })
+      tips.push({ text: `🐉 Drake dans ${cd}s — ${drakeTip}`, priority: 'medium', weight: 85, category: 'drake-timer' })
     } else if (cd > 60 && cd <= 90) {
-      tips.push({ text: `🐉 Drake respawn dans ~${Math.floor(cd / 60)} min — commence à préparer`, priority: 'low', weight: 45 })
+      tips.push({ text: `🐉 Drake respawn dans ~${Math.floor(cd / 60)} min — commence à préparer`, priority: 'low', weight: 45, category: 'drake-timer' })
     }
   } else if (gameTime > 0 && gameTime < FIRST_DRAGON) {
     const cd = Math.floor(FIRST_DRAGON - gameTime)
     const drakeTip = styleTips.drake[rotationIdx % styleTips.drake.length]
     if (cd <= 30) {
-      tips.push({ text: `🐉 Premier drake dans ${cd}s ! ${drakeTip}`, priority: 'high', weight: 90 })
+      tips.push({ text: `🐉 Premier drake dans ${cd}s ! ${drakeTip}`, priority: 'high', weight: 90, category: 'drake-timer' })
     } else if (cd <= 60) {
-      tips.push({ text: `🐉 Premier drake dans ${cd}s — ${drakeTip}`, priority: 'medium', weight: 80 })
+      tips.push({ text: `🐉 Premier drake dans ${cd}s — ${drakeTip}`, priority: 'medium', weight: 80, category: 'drake-timer' })
     }
   }
 
@@ -236,9 +297,9 @@ export function generateMacroTip(gameData: GameData, style: CoachingStyle = 'LCK
     const next = lastBaronKillAt + BARON_RESPAWN
     const cd = Math.floor(next - gameTime)
     if (cd > 0 && cd <= 30) {
-      tips.push({ text: `👁 Baron dans ${cd}s ! Groupe top et contrôle le pit`, priority: 'high', weight: 95 })
+      tips.push({ text: `👁 Baron dans ${cd}s ! Groupe top et contrôle le pit`, priority: 'high', weight: 95, category: 'baron-timer' })
     } else if (cd > 30 && cd <= 60) {
-      tips.push({ text: `👁 Baron respawn dans ${cd}s — prépare la vision`, priority: 'medium', weight: 85 })
+      tips.push({ text: `👁 Baron respawn dans ${cd}s — prépare la vision`, priority: 'medium', weight: 85, category: 'baron-timer' })
     }
   }
 
@@ -246,9 +307,9 @@ export function generateMacroTip(gameData: GameData, style: CoachingStyle = 'LCK
   if (gameTime >= 1080 && gameTime < BARON_SPAWN) {
     const cd = Math.floor(BARON_SPAWN - gameTime)
     if (cd <= 30) {
-      tips.push({ text: `👁 Baron spawn dans ${cd}s ! Ward le pit maintenant`, priority: 'high', weight: 90 })
+      tips.push({ text: `👁 Baron spawn dans ${cd}s ! Ward le pit maintenant`, priority: 'high', weight: 90, category: 'baron-timer' })
     } else if (cd <= 60) {
-      tips.push({ text: `👁 Baron spawn dans ${cd}s — prépare la vision top side`, priority: 'medium', weight: 80 })
+      tips.push({ text: `👁 Baron spawn dans ${cd}s — prépare la vision top side`, priority: 'medium', weight: 80, category: 'baron-timer' })
     }
   }
 
@@ -257,143 +318,177 @@ export function generateMacroTip(gameData: GameData, style: CoachingStyle = 'LCK
     const next = lastHeraldKillAt + HERALD_RESPAWN
     const cd = Math.floor(next - gameTime)
     if (cd > 0 && cd <= 60 && next < BARON_SPAWN) {
-      tips.push({ text: `🟡 Héraut respawn dans ${cd}s — utilise-le pour crash une tour`, priority: 'medium', weight: 75 })
+      tips.push({ text: `🟡 Héraut respawn dans ${cd}s — utilise-le pour crash une tour`, priority: 'medium', weight: 75, category: 'herald-timer' })
     }
   }
 
-  // ─── LEVEL MATCHUP (weight 60-79) ──────────────────────────────────
+  // ─── RESPAWN WINDOW (weight 88) ─────────────────────────────────────
+  // Fenêtre de push quand l'adversaire est mort avec timer connu
+
+  if (matchup && matchup.isDead && matchup.respawnTimer > 10) {
+    const respawnSec = Math.round(matchup.respawnTimer)
+    tips.push({
+      text: `💀 ${matchup.champion} mort (${respawnSec}s) — push jusqu'à la tour !`,
+      priority: 'high',
+      weight: 88,
+      category: 'respawn-window',
+    })
+  }
+
+  // ─── LEVEL MATCHUP (weight 60-78) ──────────────────────────────────
 
   if (matchup && matchup.levelDiff !== 0) {
     const opp = matchup.champion
     const diff = matchup.levelDiff
     if (diff <= -2) {
-      tips.push({ text: `⬇ ${Math.abs(diff)} niveaux de retard sur ${opp} — joue sous tour, farm safe`, priority: 'high', weight: 78 })
+      tips.push({ text: `⬇ ${Math.abs(diff)} niveaux de retard sur ${opp} — joue sous tour, farm safe`, priority: 'high', weight: 78, category: 'level-diff' })
     } else if (diff === -1) {
-      tips.push({ text: `⬇ 1 niveau de retard vs ${opp} — évite les all-in, farm pour rattraper`, priority: 'medium', weight: 65 })
+      tips.push({ text: `⬇ 1 niveau de retard vs ${opp} — évite les all-in, farm pour rattraper`, priority: 'medium', weight: 65, category: 'level-diff' })
     } else if (diff === 1) {
-      tips.push({ text: `⬆ +1 niveau sur ${opp} — trade avantageux, profite de la fenêtre`, priority: 'medium', weight: 60 })
+      tips.push({ text: `⬆ +1 niveau sur ${opp} — trade avantageux, profite de la fenêtre`, priority: 'medium', weight: 60, category: 'level-diff' })
     } else if (diff >= 2) {
-      tips.push({ text: `⬆ +${diff} niveaux sur ${opp} — zone-le du CS, cherche le dive`, priority: 'high', weight: 70 })
+      tips.push({ text: `⬆ +${diff} niveaux sur ${opp} — zone-le du CS, cherche le dive`, priority: 'high', weight: 70, category: 'level-diff' })
     }
   }
 
   // ─── CHAMPION MATCHUP (weight 55-75) ──────────────────────────────
-  // Conseil spécifique quand tu affrontes un champion en lane
+
   if (matchup) {
     const matchupTip = getMatchupTip(matchup.champion)
     if (matchupTip) {
       const danger = getChampion(matchup.champion)?.dangerLevel ?? 1
-      // Plus le champion est dangereux, plus le tip est prioritaire
       const w = danger === 3 ? 75 : danger === 2 ? 65 : 55
-      tips.push({ text: `⚔️ vs ${matchup.champion} — ${matchupTip}`, priority: danger >= 3 ? 'high' : 'medium', weight: w })
+      tips.push({ text: `⚔️ vs ${matchup.champion} — ${matchupTip}`, priority: danger >= 3 ? 'high' : 'medium', weight: w, category: 'matchup' })
     }
 
-    // Conseil class vs class (ton champion vs le champion ennemi)
+    // Conseil class vs class
     const classRule = getClassMatchup(champion, matchup.champion)
     if (classRule) {
-      tips.push({ text: `🎯 ${classRule.text}`, priority: classRule.priority, weight: 48 })
+      tips.push({ text: `🎯 ${classRule.text}`, priority: classRule.priority, weight: 40, category: 'class-rule' })
     }
   }
 
-  // ─── POWER CURVE WARNINGS (weight 50-68) ──────────────────────────
-  // Prévenir quand l'ennemi est dans sa phase forte ou faible
+  // ─── POWER CURVE WARNINGS (weight 50-58) ──────────────────────────
+
   if (matchup) {
     const enemyInfo = getChampion(matchup.champion)
     if (enemyInfo) {
       const phase = gameTime < 840 ? 'early' : gameTime < 1500 ? 'mid' : 'late'
       if (enemyInfo.power === phase) {
-        tips.push({ text: `⚠️ ${matchup.champion} est dans sa phase FORTE (${phase}) — joue prudemment`, priority: 'medium', weight: 58 })
+        tips.push({ text: `⚠️ ${matchup.champion} est dans sa phase FORTE (${phase}) — joue prudemment`, priority: 'medium', weight: 58, category: 'power-curve' })
       } else if (
         (enemyInfo.power === 'late' && phase === 'early') ||
         (enemyInfo.power === 'early' && phase === 'late')
       ) {
-        tips.push({ text: `💡 ${matchup.champion} est FAIBLE en ${phase} — profite de ta fenêtre`, priority: 'medium', weight: 52 })
+        tips.push({ text: `💡 ${matchup.champion} est FAIBLE en ${phase} — profite de ta fenêtre`, priority: 'medium', weight: 52, category: 'power-curve' })
       }
     }
   }
 
-  // ─── ENEMY COMPOSITION (weight 42-55) ─────────────────────────────
+  // ─── GOLD DIFF (weight 52-55) ──────────────────────────────────────
+
+  if (goldDiff > 3000) {
+    const kStr = (goldDiff / 1000).toFixed(1)
+    tips.push({ text: `💰 Avantage or +${kStr}k — force les objectifs maintenant`, priority: 'medium', weight: 55, category: 'gold-diff' })
+  } else if (goldDiff < -3000) {
+    const kStr = (Math.abs(goldDiff) / 1000).toFixed(1)
+    tips.push({ text: `💸 Retard or -${kStr}k — joue patient, cherche les picks`, priority: 'medium', weight: 52, category: 'gold-diff' })
+  }
+
+  // ─── ENEMY COMPOSITION (weight 50) ────────────────────────────────
+
   if (enemies.length >= 3) {
     const compTips = analyzeEnemyComp(enemies)
     for (const compTip of compTips) {
-      tips.push({ text: compTip, priority: 'medium', weight: 50 })
+      tips.push({ text: compTip, priority: 'medium', weight: 50, category: 'comp' })
     }
   }
 
-  // ─── ALLY TIPS (weight 25-38) ─────────────────────────────────────
-  // Un conseil sur un allié (rotation entre les alliés)
+  // ─── STRUCTURAL ADVANTAGE (composite kills + towers) ───────────────
+
+  const towerDiff = towers.enemyDestroyed - towers.allyDestroyed
+  if (killDiff >= 3 && towerDiff >= 2) {
+    tips.push({
+      text: `🏆 Avance structurelle (+${killDiff} kills, +${towers.enemyDestroyed} tours) — siège leur base`,
+      priority: 'high',
+      weight: 68,
+      category: 'structural',
+    })
+  }
+
+  // ─── KILL DIFF (weight 48-65) ──────────────────────────────────────
+
+  if (killDiff >= 5) {
+    const msg = styleTips.killAhead[rotationIdx % styleTips.killAhead.length]
+    tips.push({ text: `💀 +${killDiff} kills — ${msg}`, priority: killDiff >= 10 ? 'high' : 'medium', weight: killDiff >= 10 ? 65 : 55, category: 'kill-diff' })
+  } else if (killDiff >= 3) {
+    const msg = styleTips.killAhead[rotationIdx % styleTips.killAhead.length]
+    tips.push({ text: `📈 +${killDiff} kills — ${msg}`, priority: 'medium', weight: 48, category: 'kill-diff' })
+  } else if (killDiff <= -5) {
+    const msg = styleTips.killBehind[rotationIdx % styleTips.killBehind.length]
+    tips.push({ text: `⚠️ ${Math.abs(killDiff)} kills de retard — ${msg}`, priority: killDiff <= -10 ? 'high' : 'medium', weight: killDiff <= -10 ? 65 : 55, category: 'kill-diff' })
+  } else if (killDiff <= -3) {
+    const msg = styleTips.killBehind[rotationIdx % styleTips.killBehind.length]
+    tips.push({ text: `📉 ${Math.abs(killDiff)} kills de retard — ${msg}`, priority: 'medium', weight: 48, category: 'kill-diff' })
+  }
+
+  // ─── TOWER STATE (weight 40-55) ────────────────────────────────────
+
+  if (towerDiff >= 3) {
+    const msg = styleTips.towerAhead[rotationIdx % styleTips.towerAhead.length]
+    tips.push({ text: `🏰 +${towers.enemyDestroyed} tours — ${msg}`, priority: 'medium', weight: 55, category: 'tower-state' })
+  } else if (towerDiff <= -3) {
+    const msg = styleTips.towerBehind[rotationIdx % styleTips.towerBehind.length]
+    tips.push({ text: `🏰 ${towers.allyDestroyed} tours perdues — ${msg}`, priority: 'medium', weight: 55, category: 'tower-state' })
+  }
+
+  // ─── ALLY TIPS (weight 28) ─────────────────────────────────────────
+
   if (allies.length > 0) {
     const allyIdx = rotationIdx % allies.length
     const allyName = allies[allyIdx]
     const atp = getAllyTip(allyName)
     if (atp) {
-      tips.push({ text: `🤝 ${allyName} — ${atp}`, priority: 'low', weight: 28 })
+      tips.push({ text: `🤝 ${allyName} — ${atp}`, priority: 'low', weight: 28, category: 'ally' })
     }
   }
 
-  // ─── KILL DIFF (weight 50-69) ──────────────────────────────────────
-
-  if (killDiff >= 5) {
-    const msg = styleTips.killAhead[rotationIdx % styleTips.killAhead.length]
-    tips.push({ text: `💀 +${killDiff} kills — ${msg}`, priority: killDiff >= 10 ? 'high' : 'medium', weight: killDiff >= 10 ? 65 : 55 })
-  } else if (killDiff >= 3) {
-    const msg = styleTips.killAhead[rotationIdx % styleTips.killAhead.length]
-    tips.push({ text: `📈 +${killDiff} kills — ${msg}`, priority: 'medium', weight: 50 })
-  } else if (killDiff <= -5) {
-    const msg = styleTips.killBehind[rotationIdx % styleTips.killBehind.length]
-    tips.push({ text: `⚠️ ${Math.abs(killDiff)} kills de retard — ${msg}`, priority: killDiff <= -10 ? 'high' : 'medium', weight: killDiff <= -10 ? 65 : 55 })
-  } else if (killDiff <= -3) {
-    const msg = styleTips.killBehind[rotationIdx % styleTips.killBehind.length]
-    tips.push({ text: `📉 ${Math.abs(killDiff)} kills de retard — ${msg}`, priority: 'medium', weight: 50 })
-  }
-
-  // ─── TOWER STATE (weight 40-59) ────────────────────────────────────
-
-  const towerDiff = towers.enemyDestroyed - towers.allyDestroyed
-  if (towerDiff >= 3) {
-    const msg = styleTips.towerAhead[rotationIdx % styleTips.towerAhead.length]
-    tips.push({ text: `🏰 +${towers.enemyDestroyed} tours — ${msg}`, priority: 'medium', weight: 55 })
-  } else if (towerDiff <= -3) {
-    const msg = styleTips.towerBehind[rotationIdx % styleTips.towerBehind.length]
-    tips.push({ text: `🏰 ${towers.allyDestroyed} tours perdues — ${msg}`, priority: 'medium', weight: 55 })
-  }
-
-  // ─── PLATES REMINDER (weight 40-42) ────────────────────────────────
+  // ─── PLATES REMINDER (weight 42) ────────────────────────────────────
 
   if (gameTime >= 720 && gameTime < PLATES_FALL) {
     const cd = Math.floor(PLATES_FALL - gameTime)
-    tips.push({ text: `💰 Plaques dans ${cd}s — ${styleTips.plates}`, priority: 'medium', weight: 42 })
+    tips.push({ text: `💰 Plaques dans ${cd}s — ${styleTips.plates}`, priority: 'medium', weight: 42, category: 'plates' })
   }
 
-  // ─── ITEMS POWER SPIKE (weight 35-40) ──────────────────────────────
+  // ─── ITEMS POWER SPIKE (weight 33-38) ──────────────────────────────
 
   const completedItems = items.length
   if (completedItems === 1 && gameTime >= 480 && gameTime < 900) {
-    tips.push({ text: `⚔️ Premier item complété — ${styleTips.itemSpike}`, priority: 'low', weight: 40 })
+    tips.push({ text: `⚔️ Premier item complété — ${styleTips.itemSpike}`, priority: 'low', weight: 38, category: 'item-spike' })
   } else if (completedItems === 2 && gameTime >= 900) {
-    tips.push({ text: `⚔️ 2 items — ${styleTips.itemSpike}`, priority: 'low', weight: 38 })
+    tips.push({ text: `⚔️ 2 items — ${styleTips.itemSpike}`, priority: 'low', weight: 35, category: 'item-spike' })
   } else if (completedItems >= 3) {
-    tips.push({ text: `⚔️ ${completedItems} items — ${styleTips.itemSpike}`, priority: 'low', weight: 35 })
+    tips.push({ text: `⚔️ ${completedItems} items — ${styleTips.itemSpike}`, priority: 'low', weight: 33, category: 'item-spike' })
   }
 
-  // ─── CS FEEDBACK (weight 30-38) ────────────────────────────────────
+  // ─── CS FEEDBACK (weight 20-25) ────────────────────────────────────
 
   if (gameTime >= 300 && csPerMin > 0) {
     if (csPerMin < 4) {
-      tips.push({ text: `📊 ${csPerMin.toFixed(1)} CS/min — c'est très bas, focus les last hits, chaque 15 CS = 1 kill`, priority: 'medium', weight: 38 })
+      tips.push({ text: `📊 ${csPerMin.toFixed(1)} CS/min — c'est très bas, focus les last hits, chaque 15 CS = 1 kill`, priority: 'medium', weight: 25, category: 'cs' })
     } else if (csPerMin < 6) {
-      tips.push({ text: `📊 ${csPerMin.toFixed(1)} CS/min — essaie d'atteindre 7+, ne rate pas les canons`, priority: 'low', weight: 32 })
+      tips.push({ text: `📊 ${csPerMin.toFixed(1)} CS/min — essaie d'atteindre 7+, ne rate pas les canons`, priority: 'low', weight: 22, category: 'cs' })
     } else if (csPerMin >= 9) {
-      tips.push({ text: `📊 ${csPerMin.toFixed(1)} CS/min — excellent farming, garde ce rythme`, priority: 'low', weight: 30 })
+      tips.push({ text: `📊 ${csPerMin.toFixed(1)} CS/min — excellent farming, garde ce rythme`, priority: 'low', weight: 20, category: 'cs' })
     }
   }
 
-  // ─── GENERAL PHASE TIPS (weight 10-25, rotation) ───────────────────
+  // ─── GENERAL PHASE TIPS (weight 10, rotation) ───────────────────
 
   const phaseTips = getPhaseGeneralTips(gameData, style)
   if (phaseTips.length > 0) {
     const pick = phaseTips[rotationIdx % phaseTips.length]
-    tips.push({ ...pick, weight: 15 })
+    tips.push({ ...pick, weight: 10, category: 'phase' })
   }
 
   // ─── SÉLECTION DU MEILLEUR TIP ─────────────────────────────────────
@@ -402,23 +497,33 @@ export function generateMacroTip(gameData: GameData, style: CoachingStyle = 'LCK
     return { text: `🎯 ${champion} — analyse de la situation en cours...`, priority: 'low' }
   }
 
-  tips.sort((a, b) => b.weight - a.weight)
+  // Filtrer les tips en cooldown de catégorie (seulement pour les tips légers)
+  const availableTips = tips.filter(t => t.weight >= 60 || !isCategoryOnCooldown(t.category, gameTime))
+  const tipsToSort = availableTips.length > 0 ? availableTips : tips
+  tipsToSort.sort((a, b) => b.weight - a.weight)
 
-  // Prendre le tip le plus important, éviter la répétition sauf si critique
-  let pick = tips[0]
-  if (pick.text === lastTipText && tips.length > 1 && pick.weight < 80) {
-    pick = tips[1]
+  // Éviter la répétition des derniers tips (sauf si critique weight >= 80)
+  let pick = tipsToSort[0]
+  if (pick.weight < 80) {
+    const nonRecent = tipsToSort.find(t => !isRecentTip(t.text))
+    if (nonRecent) {
+      pick = nonRecent
+    } else if (pick.text === lastTipText && tipsToSort.length > 1) {
+      pick = tipsToSort[1]
+    }
+  } else if (pick.text === lastTipText && tipsToSort.length > 1) {
+    pick = tipsToSort[1]
   }
 
   lastTipText = pick.text
+  addRecentTip(pick.text)
+  markCategoryUsed(pick.category, gameTime)
   rotationIdx++
 
-  return { text: pick.text, priority: pick.priority }
+  return { text: pick.text, priority: pick.priority, category: pick.category }
 }
 
 // ─── Tips généraux par phase de jeu ────────────────────────────────────────
-
-// ─── Tips de phase par style ─────────────────────────────────────────────────
 
 type PhaseTip = { text: string; priority: 'low' | 'medium' | 'high' }
 

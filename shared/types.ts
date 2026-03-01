@@ -113,6 +113,7 @@ export interface CoachAdvice {
   priority: 'low' | 'medium' | 'high'
   timestamp: number
   gameTime: number
+  category?: string  // ex: 'drake-timer' | 'baron-timer' | 'herald-timer' | 'level-diff' | 'item-spike' …
 }
 
 // Timers des objectifs

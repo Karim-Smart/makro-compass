@@ -118,13 +118,24 @@ export default function OverlayApp() {
       const a = newAdvice as CoachAdvice
       setAdviceQueue((prev) => {
         if (prev.length > 0 && prev[prev.length - 1].text === a.text) return prev
+
+        // Si l'advice a une catégorie, remplace l'entrée existante de même catégorie
+        if (a.category) {
+          const idx = prev.findIndex(x => x.category === a.category)
+          if (idx !== -1) {
+            const next = [...prev]
+            next[idx] = a
+            return next
+          }
+        }
+
         const next = [...prev, a]
         if (next.length > ADVICE_QUEUE_MAX) {
-          // Supprimer le plus ancien de priorité la plus basse
-          const lowestIdx = next.reduce((minI, item, i, arr) => {
-            const pri = { high: 3, medium: 2, low: 1 }
-            return (pri[item.priority] ?? 0) < (pri[arr[minI].priority] ?? 0) ? i : minI
-          }, 0)
+          // Supprimer le plus bas en priorité
+          const pri = { high: 3, medium: 2, low: 1 }
+          const lowestIdx = next.reduce((minI, item, i, arr) =>
+            (pri[item.priority] ?? 0) < (pri[arr[minI].priority] ?? 0) ? i : minI
+          , 0)
           next.splice(lowestIdx, 1)
         }
         return next
@@ -138,7 +149,7 @@ export default function OverlayApp() {
       alertTimeoutRef.current = setTimeout(() => setAlert(null), 3_000)
       // TTS — uniquement dans le panneau advice (évite 5 fenêtres en simultané)
       if (panel === 'advice' && voiceAlertsRef.current) {
-        speak(a.message, voiceVolumeRef.current)
+        speak(a.text, voiceVolumeRef.current)
       }
     }
 

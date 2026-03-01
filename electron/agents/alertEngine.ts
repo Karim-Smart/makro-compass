@@ -73,7 +73,8 @@ export function detectAlerts(gameData: GameData): GameAlert[] {
 
     if (!prevMatchupDead && matchup.isDead) {
       // L'ennemi vient de mourir
-      alerts.push({ text: `💀 ${oppName} est mort — pousse ta vague !`, type: 'success' })
+      const respawnStr = matchup.respawnTimer > 0 ? ` (${Math.round(matchup.respawnTimer)}s)` : ''
+      alerts.push({ text: `💀 ${oppName} mort${respawnStr} — pousse ta vague !`, type: 'success' })
     } else if (prevMatchupDead && !matchup.isDead) {
       // L'ennemi vient de respawn
       alerts.push({ text: `⚠️ ${oppName} revient en jeu — attention`, type: 'warning' })

@@ -17,8 +17,35 @@ const PRIORITY_META = {
 
 type P = keyof typeof PRIORITY_META
 
+// Badge de catégorie contextuel — remplace le badge style en position principale
+const CATEGORY_BADGE: Record<string, { label: string; color: string }> = {
+  'elder-active':   { label: 'OBJECTIF', color: '#f97316' },
+  'baron-buff':     { label: 'OBJECTIF', color: '#f97316' },
+  'soul-point':     { label: 'OBJECTIF', color: '#f97316' },
+  'dragon-soul':    { label: 'OBJECTIF', color: '#f97316' },
+  'drake-timer':    { label: 'OBJECTIF', color: '#f97316' },
+  'baron-timer':    { label: 'OBJECTIF', color: '#f97316' },
+  'herald-timer':   { label: 'OBJECTIF', color: '#f97316' },
+  'respawn-window': { label: 'LANE',     color: '#22d3ee' },
+  'level-diff':     { label: 'LANE',     color: '#22d3ee' },
+  'matchup':        { label: 'LANE',     color: '#22d3ee' },
+  'class-rule':     { label: 'LANE',     color: '#22d3ee' },
+  'power-curve':    { label: 'LANE',     color: '#22d3ee' },
+  'cs':             { label: 'LANE',     color: '#22d3ee' },
+  'gold-diff':      { label: 'MACRO',    color: '#a78bfa' },
+  'kill-diff':      { label: 'MACRO',    color: '#a78bfa' },
+  'tower-state':    { label: 'MACRO',    color: '#a78bfa' },
+  'structural':     { label: 'MACRO',    color: '#a78bfa' },
+  'plates':         { label: 'MACRO',    color: '#a78bfa' },
+  'phase':          { label: 'MACRO',    color: '#a78bfa' },
+  'comp':           { label: 'MACRO',    color: '#a78bfa' },
+  'ally':           { label: 'MACRO',    color: '#a78bfa' },
+  'item-spike':     { label: 'ITEM',     color: '#f59e0b' },
+}
+
 export function AdviceOverlay({ advice, colors, queuePos, queueTotal, rotateKey, onMinimize }: Props) {
   const meta = PRIORITY_META[advice.priority as P] ?? PRIORITY_META.medium
+  const catBadge = advice.category ? CATEGORY_BADGE[advice.category] : undefined
 
   return (
     <div
@@ -41,13 +68,22 @@ export function AdviceOverlay({ advice, colors, queuePos, queueTotal, rotateKey,
         {/* Header */}
         <div className="flex items-center justify-between mb-2.5">
           <div className="flex items-center gap-2">
-            {/* Style badge */}
-            <span
-              className="text-[9px] font-black px-2 py-0.5 rounded tracking-widest"
-              style={{ backgroundColor: `${colors.accent}25`, color: colors.accent }}
-            >
-              {advice.style}
-            </span>
+            {/* Badge catégorie (principal) ou style si pas de catégorie */}
+            {catBadge ? (
+              <span
+                className="text-[9px] font-black px-2 py-0.5 rounded tracking-widest"
+                style={{ backgroundColor: `${catBadge.color}25`, color: catBadge.color }}
+              >
+                {catBadge.label}
+              </span>
+            ) : (
+              <span
+                className="text-[9px] font-black px-2 py-0.5 rounded tracking-widest"
+                style={{ backgroundColor: `${colors.accent}25`, color: colors.accent }}
+              >
+                {advice.style}
+              </span>
+            )}
             {/* Priority */}
             <span
               className="text-[9px] font-bold"
@@ -93,9 +129,21 @@ export function AdviceOverlay({ advice, colors, queuePos, queueTotal, rotateKey,
           {advice.text}
         </p>
 
+        {/* Style coaching — discret, en bas si catégorie affichée en haut */}
+        {catBadge && (
+          <div className="mt-2 flex items-center gap-1">
+            <span
+              className="text-[8px] font-black tracking-widest opacity-30"
+              style={{ color: colors.accent }}
+            >
+              {advice.style}
+            </span>
+          </div>
+        )}
+
         {/* Barre de décompte 30s */}
         <div
-          className="h-px mt-3 rounded-full overflow-hidden"
+          className="h-px mt-2 rounded-full overflow-hidden"
           style={{ backgroundColor: `${colors.border}80` }}
         >
           <div
