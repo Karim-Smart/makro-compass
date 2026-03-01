@@ -49,13 +49,11 @@ export function AdviceOverlay({ advice, colors, queuePos, queueTotal, rotateKey,
 
   return (
     <div
-      className="w-80 clip-bevel overflow-hidden animate-slide-up"
+      className="w-80 overflow-hidden animate-slide-up"
       style={{
-        background: `rgba(1, 10, 19, 0.9)`,
+        background: '#0A1628',
         border: `1px solid rgba(200, 155, 60, 0.2)`,
         boxShadow: `0 8px 32px rgba(0,0,0,0.6), 0 0 12px rgba(200, 155, 60, 0.06)`,
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
       }}
     >
       {/* Ligne d'accent dorée en haut */}

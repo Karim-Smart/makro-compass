@@ -14,25 +14,23 @@
 
 @layer base {
   html, body {
-    background: transparent;
+    background: #010A13;
     margin: 0;
     padding: 0;
     overflow: hidden;
   }
 
   #root {
-    background: transparent;
+    background: #010A13;
     width: 100%;
     height: 100%;
   }
 }
 
-/* ─── Overlay glassmorphism ─────────────────────────────────────────────────── */
+/* ─── Overlay panel styling (opaque — transparent:true casse l'affichage in-game) */
 
 .overlay-glass {
-  background: rgba(1, 10, 19, 0.88);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: #0A1628;
   border: 1px solid rgba(200, 155, 60, 0.2);
 }
 

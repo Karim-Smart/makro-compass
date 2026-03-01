@@ -281,7 +281,7 @@ export function setupIpcHandlers(
       if (nextVisible) win.show()
       else win.hide()
     }
-    mainWindow.webContents.send(IPC.OVERLAY_TOGGLE, nextVisible)
+    if (!mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.OVERLAY_TOGGLE, nextVisible)
   })
 
   // ─── Import runes via bouton overlay ou F6 ──────────────────────────────
@@ -333,13 +333,16 @@ export function setupIpcHandlers(
 
   // ─── Window controls (frameless) ─────────────────────────────────────────
   ipcMain.on('window:minimize', () => {
+    if (mainWindow.isDestroyed()) return
     mainWindow.minimize()
   })
   ipcMain.on('window:maximize', () => {
+    if (mainWindow.isDestroyed()) return
     if (mainWindow.isMaximized()) mainWindow.unmaximize()
     else mainWindow.maximize()
   })
   ipcMain.on('window:close', () => {
+    if (mainWindow.isDestroyed()) return
     mainWindow.close()
   })
 
@@ -403,7 +406,9 @@ async function startAgents(mainWindow: BrowserWindow, overlayWindows: BrowserWin
 
     // Envoyer les settings voix aux overlays au démarrage
     for (const win of overlayWindows) {
+      if (!win || win.isDestroyed()) continue
       win.webContents.once('did-finish-load', () => {
+        if (win.isDestroyed()) return
         win.webContents.send(IPC.SETTINGS_UPDATE, {
           voiceAlerts: settings.voiceAlerts ?? true,
           voiceVolume: settings.voiceVolume ?? 0.8,
@@ -418,7 +423,7 @@ async function startAgents(mainWindow: BrowserWindow, overlayWindows: BrowserWin
 
     const status = await getSubscriptionStatus()
     setOverlayTier(status.tier)
-    mainWindow.webContents.send(IPC.SUBSCRIPTION_STATUS, status)
+    if (!mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.SUBSCRIPTION_STATUS, status)
   } catch (err) {
     console.error('[Main] Erreur démarrage agents:', err)
   }

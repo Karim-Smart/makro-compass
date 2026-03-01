@@ -41,7 +41,7 @@ export function MatchupBriefingCard({ data, colors: c }: Props) {
   const dangerColor = getDangerColor(data.dangerLevel)
 
   return (
-    <div className="px-3 py-1.5 flex flex-col gap-1 overflow-hidden overlay-glass clip-bevel" style={{ maxHeight: 160 }}>
+    <div className="px-3 py-1.5 flex flex-col gap-1 overflow-hidden overlay-glass" style={{ maxHeight: 160 }}>
       {/* Header : MATCHUP + danger level */}
       <div className="flex items-center justify-between">
         <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: c.accent, opacity: 0.5 }}>

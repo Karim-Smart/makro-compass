@@ -74,9 +74,6 @@ export function StatsOverlay({ gameData, colors }: Props) {
   return (
     <div
       className="overflow-hidden animate-fade-in"
-      style={{
-        background: 'transparent',
-      }}
     >
       <div className="flex">
         {cols.map(({ label, main, sub, mainColor }, i) => (

@@ -112,6 +112,8 @@ export const useDraftStore = create<DraftStoreState & DraftStoreActions>((set, g
 
   init: () => {
     if (!window.electronAPI) return
+    if ((window as unknown as { _draftIpcInit?: boolean })._draftIpcInit) return
+    ;(window as unknown as { _draftIpcInit?: boolean })._draftIpcInit = true
     window.electronAPI.on(IPC.DRAFT_UPDATE, (state: unknown) => {
       get().setDraftState(state as DraftState)
     })

@@ -16,9 +16,11 @@ const DEFAULT_SETTINGS: UserSettings = {
   overlayPosition: { x: 100, y: 100 },
   region: 'EUW',
   selectedStyle: 'LCK',
-  overlayPanels: { stats: true, timers: true, advice: true, style: true, build: true },
+  overlayPanels: { stats: true, timers: true, advice: true, style: true, build: true, wincondition: false },
   voiceAlerts: true,
   voiceVolume: 0.8,
+  shotcallerMode: false,
+  customCoachTone: '',
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({

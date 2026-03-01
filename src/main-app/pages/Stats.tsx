@@ -617,7 +617,7 @@ export default function Stats() {
 // ─── Composant panneau review inline ────────────────────────────────────────
 
 const GRADE_COLOR: Record<string, string> = {
-  S: '#facc15', A: '#22c55e', B: '#60a5fa', C: '#f59e0b', D: '#ef4444',
+  'S+': '#facc15', S: '#facc15', A: '#22c55e', B: '#60a5fa', C: '#f59e0b', D: '#ef4444',
 }
 
 const EVENT_COLOR: Record<string, string> = {

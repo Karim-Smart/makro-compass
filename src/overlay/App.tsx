@@ -303,12 +303,12 @@ export default function OverlayApp() {
     <div
       className="w-full h-full"
       style={{
-        background: 'transparent',
+        background: '#010A13',
         userSelect: 'none',
       }}
     >
       {panel === 'stats' && inGame && (
-        <div className="relative h-full overlay-glass clip-bevel">
+        <div className="relative h-full overlay-glass">
           <StatsOverlay gameData={gameData!} colors={colors} />
           {tiltStatus && tiltStatus.tiltLevel !== 'none' && (
             <div className="absolute top-1 right-1 z-10">
@@ -319,7 +319,7 @@ export default function OverlayApp() {
       )}
 
       {panel === 'timers' && inGame && (
-        <div className="space-y-1 overlay-glass clip-bevel h-full">
+        <div className="space-y-1 overlay-glass h-full">
           {timers && <TimerOverlay timers={timers} colors={colors} />}
           <ItemsOverlay gameData={gameData!} colors={colors} />
         </div>
@@ -380,33 +380,33 @@ export default function OverlayApp() {
       )}
 
       {panel === 'build' && buildData && (
-        <div className="overlay-glass clip-bevel h-full">
+        <div className="overlay-glass h-full">
           <BuildStrip build={buildData.myBuild} colors={colors} />
         </div>
       )}
 
       {panel === 'style' && (
-        <div className="overlay-glass clip-bevel h-full">
+        <div className="overlay-glass h-full">
           <StyleSwitcher selectedStyle={selectedStyle} />
         </div>
       )}
 
       {panel === 'wincondition' && winCondition && (
-        <div className="overlay-glass clip-bevel h-full">
+        <div className="overlay-glass h-full">
           <WinConditionOverlay data={winCondition} colors={colors} />
         </div>
       )}
 
       {/* Message d'attente si pas encore en jeu */}
       {!inGame && panel !== 'advice' && panel !== 'style' && (
-        <div className="flex items-center justify-center h-full px-3 overlay-glass clip-bevel">
+        <div className="flex items-center justify-center h-full px-3 overlay-glass">
           <span className="text-[10px] font-mono" style={{ color: `${colors.accent}50` }}>
             En attente de partie...
           </span>
         </div>
       )}
       {panel === 'advice' && !currentAdvice && !alert && !matchupBriefing && !(inGame && gameData?.matchup && gameData.matchup.levelDiff !== 0) && (
-        <div className="flex flex-col items-center justify-center h-full px-3 gap-1 overlay-glass clip-bevel">
+        <div className="flex flex-col items-center justify-center h-full px-3 gap-1 overlay-glass">
           <span className="text-[10px] font-mono" style={{ color: `${colors.accent}50` }}>
             {inGame ? 'Analyse en cours...' : 'En attente de partie...'}
           </span>

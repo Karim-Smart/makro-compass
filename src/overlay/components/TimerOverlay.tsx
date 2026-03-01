@@ -7,7 +7,7 @@ interface Props {
 }
 
 function useNow(interval = 500) {
-  const [now, setNow] = useState(Date.now)
+  const [now, setNow] = useState(Date.now())
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), interval)
     return () => clearInterval(id)
@@ -58,9 +58,6 @@ export function TimerOverlay({ timers, colors }: Props) {
   return (
     <div
       className="overflow-hidden animate-fade-in min-w-[160px]"
-      style={{
-        background: 'transparent',
-      }}
     >
       {/* Header */}
       <div
