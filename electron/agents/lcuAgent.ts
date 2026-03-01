@@ -122,21 +122,44 @@ function getLcuHeaders(): Record<string, string> {
 }
 
 async function fetchChampionMap(): Promise<void> {
+  // 1. Essai rapide via LCU (5s max — le fichier peut être lent via WSL2)
   try {
     const resp = await lcuHttpClient.get(
       getLcuUrl('/lol-game-data/assets/v1/champion-summary.json'),
-      { headers: getLcuHeaders() },
+      { headers: getLcuHeaders(), timeout: 5_000 },
     )
     const data = resp.data as Array<{ id: number; name: string }>
     championMap = {}
     for (const champ of data) {
       if (champ.id > 0) championMap[champ.id] = champ.name
     }
-    console.log(`[LCUAgent] ${Object.keys(championMap).length} champions chargés`)
+    console.log(`[LCUAgent] ${Object.keys(championMap).length} champions chargés (LCU)`)
+    return
+  } catch {
+    console.warn('[LCUAgent] Champion map LCU lente/indisponible — fallback DDragon CDN')
+  }
+
+  // 2. Fallback DDragon CDN (internet direct, sans le bridge WSL2→Windows)
+  try {
+    const versionsResp = await axios.get<string[]>(
+      'https://ddragon.leagueoflegends.com/api/versions.json',
+      { timeout: 5_000 },
+    )
+    const latestVersion = versionsResp.data[0]
+
+    const champResp = await axios.get<{ data: Record<string, { key: string; name: string }> }>(
+      `https://ddragon.leagueoflegends.com/cdn/${latestVersion}/data/en_US/champion.json`,
+      { timeout: 10_000 },
+    )
+    championMap = {}
+    for (const champ of Object.values(champResp.data.data)) {
+      const id = parseInt(champ.key, 10)
+      if (id > 0) championMap[id] = champ.name
+    }
+    console.log(`[LCUAgent] ${Object.keys(championMap).length} champions chargés (DDragon ${latestVersion})`)
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
     console.warn(`[LCUAgent] Impossible de charger la map des champions: ${msg}`)
-    console.warn(`[LCUAgent] URL tentée: ${getLcuUrl('/lol-game-data/assets/v1/champion-summary.json')}`)
   }
 }
 
@@ -335,19 +358,17 @@ export async function importRecentRankedGames(count = 5): Promise<number> {
   if (!lcuPort || !lcuPassword) return 0
 
   try {
-    // Récupérer l'identité du summoner connecté
-    const summonerResp = await lcuHttpClient.get(
-      getLcuUrl('/lol-summoner/v1/current-summoner'),
-      { headers: getLcuHeaders() },
-    )
-    const summoner = summonerResp.data as { accountId: string; summonerId: number }
-
-    // Récupérer l'historique (on en prend 2× plus pour avoir assez après filtre ranked)
+    // Une seule requête LCU : l'endpoint "current-summoner" inclut l'accountId
+    // dans le corps de la réponse — pas besoin d'un appel séparé /lol-summoner
     const histResp = await lcuHttpClient.get(
       getLcuUrl(`/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=${count * 2 - 1}`),
-      { headers: getLcuHeaders() },
+      { headers: getLcuHeaders(), timeout: 30_000 },
     )
-    const histData = histResp.data as { games: { games: LcuMatchHistoryGame[] } }
+    const histData = histResp.data as {
+      accountId: string             // accountId du joueur connecté
+      games: { games: LcuMatchHistoryGame[] }
+    }
+    const myAccountId = histData.accountId ?? ''
     const allGames: LcuMatchHistoryGame[] = histData?.games?.games ?? []
 
     let imported = 0
@@ -359,10 +380,10 @@ export async function importRecentRankedGames(count = 5): Promise<number> {
       const queueType = RANKED_QUEUE_IDS[game.queueId]
       if (!queueType) continue
 
-      // Trouver le participant correspondant au summoner actuel
+      // Trouver le participant correspondant au joueur actuel via accountId
       const identity = game.participantIdentities.find(
-        (pi) => pi.player.summonerId === summoner.summonerId
-          || pi.player.accountId === summoner.accountId,
+        (pi) => pi.player.accountId === myAccountId
+          || pi.player.currentAccountId === myAccountId,
       )
       if (!identity) continue
 
@@ -541,7 +562,7 @@ export async function startLcuAgent(): Promise<void> {
         if (retryTimer) { clearInterval(retryTimer); retryTimer = null }
         pollTimer = setInterval(poll, LCU_POLL_MS)
         gameflowPollTimer = setInterval(pollGameflow, 5000)
-        if (!hasImportedGames) {
+        if (!hasImportedGames && Object.keys(championMap).length > 0) {
           hasImportedGames = true
           importRecentRankedGames(5)
         }
@@ -564,8 +585,8 @@ export async function startLcuAgent(): Promise<void> {
   pollTimer = setInterval(poll, LCU_POLL_MS)
   gameflowPollTimer = setInterval(pollGameflow, 5000)
 
-  // Import des 5 dernières parties classées (une seule fois par session)
-  if (!hasImportedGames) {
+  // Import des 5 dernières parties classées (seulement si la champion map est chargée)
+  if (!hasImportedGames && Object.keys(championMap).length > 0) {
     hasImportedGames = true
     importRecentRankedGames(5)
   }
