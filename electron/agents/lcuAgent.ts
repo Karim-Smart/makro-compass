@@ -12,6 +12,8 @@ import type { DraftState, DraftPick, FullRunePage } from '../../shared/types'
 import { broadcastToWindows } from '../main/ipcHandlers'
 import { generateRunePages } from '../../shared/rune-data'
 import { getCoachingStyle } from './aiCoachAgent'
+import { saveRankedGameDirect } from './quotaManager'
+import type { RankedQueueType } from '../../shared/types'
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 
@@ -36,6 +38,7 @@ let lastAutoImportChampion = ''
 let lastDetectedQueueId: number | null = null
 let isReplayMode = false
 let gameflowPollTimer: ReturnType<typeof setInterval> | null = null
+let hasImportedGames = false  // évite de ré-importer à chaque reconnexion
 
 function detectLcuHost(): string {
   // Si Electron tourne sur Windows (même lancé depuis WSL2), utiliser localhost
@@ -281,6 +284,147 @@ async function pollGameflow(): Promise<void> {
   }
 }
 
+// ─── Import historique LCU ──────────────────────────────────────────────────
+
+interface LcuMatchStats {
+  win: boolean
+  kills: number
+  deaths: number
+  assists: number
+  totalMinionsKilled: number
+  neutralMinionsKilled: number
+  goldEarned: number
+  champLevel: number
+  visionScore: number
+  item0: number; item1: number; item2: number
+  item3: number; item4: number; item5: number; item6: number
+}
+
+interface LcuMatchParticipant {
+  participantId: number
+  teamId: number
+  championId: number
+  stats: LcuMatchStats
+}
+
+interface LcuMatchIdentity {
+  participantId: number
+  player: { accountId: string; summonerId: number; summonerName: string }
+}
+
+interface LcuMatchHistoryGame {
+  gameId: number
+  queueId: number
+  gameCreation: number   // timestamp ms
+  gameDuration: number   // secondes
+  participants: LcuMatchParticipant[]
+  participantIdentities: LcuMatchIdentity[]
+}
+
+const RANKED_QUEUE_IDS: Record<number, RankedQueueType> = {
+  420: 'RANKED_SOLO',
+  440: 'RANKED_FLEX',
+}
+
+/**
+ * Importe les N dernières parties classées depuis l'historique du client LoL.
+ * Utilise INSERT OR IGNORE : les parties déjà présentes sont ignorées sans erreur.
+ * Retourne le nombre de nouvelles parties insérées.
+ */
+export async function importRecentRankedGames(count = 5): Promise<number> {
+  if (!lcuPort || !lcuPassword) return 0
+
+  try {
+    // Récupérer l'identité du summoner connecté
+    const summonerResp = await lcuHttpClient.get(
+      getLcuUrl('/lol-summoner/v1/current-summoner'),
+      { headers: getLcuHeaders() },
+    )
+    const summoner = summonerResp.data as { accountId: string; summonerId: number }
+
+    // Récupérer l'historique (on en prend 2× plus pour avoir assez après filtre ranked)
+    const histResp = await lcuHttpClient.get(
+      getLcuUrl(`/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=${count * 2 - 1}`),
+      { headers: getLcuHeaders() },
+    )
+    const histData = histResp.data as { games: { games: LcuMatchHistoryGame[] } }
+    const allGames: LcuMatchHistoryGame[] = histData?.games?.games ?? []
+
+    let imported = 0
+
+    for (const game of allGames) {
+      if (imported >= count) break
+
+      // Filtrer : ranked solo ou flex uniquement
+      const queueType = RANKED_QUEUE_IDS[game.queueId]
+      if (!queueType) continue
+
+      // Trouver le participant correspondant au summoner actuel
+      const identity = game.participantIdentities.find(
+        (pi) => pi.player.summonerId === summoner.summonerId
+          || pi.player.accountId === summoner.accountId,
+      )
+      if (!identity) continue
+
+      const me = game.participants.find((p) => p.participantId === identity.participantId)
+      if (!me) continue
+
+      // Répartir les participants en équipe alliée et ennemie
+      const myTeam = game.participants.filter((p) => p.teamId === me.teamId)
+      const enemies = game.participants.filter((p) => p.teamId !== me.teamId)
+
+      const allyNames = myTeam
+        .filter((p) => p.participantId !== me.participantId)
+        .map((p) => championMap[p.championId] ?? `Champion_${p.championId}`)
+
+      const enemyNames = enemies
+        .map((p) => championMap[p.championId] ?? `Champion_${p.championId}`)
+
+      const teamKills = myTeam.reduce((s, p) => s + p.stats.kills, 0)
+      const enemyKills = enemies.reduce((s, p) => s + p.stats.kills, 0)
+
+      const items = [
+        me.stats.item0, me.stats.item1, me.stats.item2,
+        me.stats.item3, me.stats.item4, me.stats.item5, me.stats.item6,
+      ].filter((id) => id > 0).map(String)
+
+      const inserted = saveRankedGameDirect({
+        gameId: String(game.gameId),
+        timestamp: game.gameCreation,
+        queueType,
+        champion: championMap[me.championId] ?? `Champion_${me.championId}`,
+        kills: me.stats.kills,
+        deaths: me.stats.deaths,
+        assists: me.stats.assists,
+        cs: me.stats.totalMinionsKilled + me.stats.neutralMinionsKilled,
+        gold: me.stats.goldEarned,
+        gameTime: game.gameDuration,
+        teamKills,
+        enemyKills,
+        wardScore: me.stats.visionScore ?? 0,
+        level: me.stats.champLevel,
+        items,
+        allies: allyNames,
+        enemies: enemyNames,
+        result: me.stats.win ? 'win' : 'loss',
+      })
+
+      if (inserted) imported++
+    }
+
+    if (imported > 0) {
+      broadcastToWindows(IPC.RANKED_IMPORT_DONE, { count: imported })
+      console.log(`[LCUAgent] ${imported} partie(s) classée(s) importée(s) depuis l'historique`)
+    }
+
+    return imported
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.warn(`[LCUAgent] Impossible d'importer l'historique: ${msg}`)
+    return 0
+  }
+}
+
 // ─── Polling champion select ────────────────────────────────────────────────
 
 interface LcuChampSelectSession {
@@ -397,6 +541,10 @@ export async function startLcuAgent(): Promise<void> {
         if (retryTimer) { clearInterval(retryTimer); retryTimer = null }
         pollTimer = setInterval(poll, LCU_POLL_MS)
         gameflowPollTimer = setInterval(pollGameflow, 5000)
+        if (!hasImportedGames) {
+          hasImportedGames = true
+          importRecentRankedGames(5)
+        }
       } else if (connectionAttempts % 10 === 0) {
         console.debug(`[LCUAgent] Toujours pas de client (${connectionAttempts} tentatives)`)
       }
@@ -415,6 +563,12 @@ export async function startLcuAgent(): Promise<void> {
   // Commencer le polling
   pollTimer = setInterval(poll, LCU_POLL_MS)
   gameflowPollTimer = setInterval(pollGameflow, 5000)
+
+  // Import des 5 dernières parties classées (une seule fois par session)
+  if (!hasImportedGames) {
+    hasImportedGames = true
+    importRecentRankedGames(5)
+  }
 }
 
 export function stopLcuAgent(): void {
@@ -434,5 +588,6 @@ export function stopLcuAgent(): void {
   lcuPassword = null
   lastAutoImportChampion = ''
   isReplayMode = false
+  hasImportedGames = false
   console.log('[LCUAgent] Arrêté.')
 }

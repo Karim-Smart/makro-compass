@@ -47,7 +47,10 @@ export const IPC = {
   REPLAY_DETECTED: 'replay:detected',
   OVERLAY_REVIEW: 'overlay:review',
   LAUNCH_REPLAY: 'launch:replay',
-  REVIEW_GENERATE: 'review:generate'
+  REVIEW_GENERATE: 'review:generate',
+
+  // Import automatique de l'historique LCU au démarrage
+  RANKED_IMPORT_DONE: 'ranked:import-done',
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

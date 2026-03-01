@@ -37,6 +37,8 @@ export default function Stats() {
   const [games, setGames] = useState<RankedGame[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<QueueTab>('RANKED_SOLO')
+  // refreshKey s'incrémente quand l'import LCU termine → force le rechargement
+  const [refreshKey, setRefreshKey] = useState(0)
 
   // Review : stocke la timeline générée par gameId (null = pas chargé, 'loading' = en cours)
   const [reviews, setReviews] = useState<Record<number, ReviewTimeline | 'loading'>>({})
@@ -45,13 +47,21 @@ export default function Stats() {
   // Feedback quand le replay est lancé
   const [launchingReplay, setLaunchingReplay] = useState<number | null>(null)
 
+  // Rechargement quand l'onglet change ou quand l'import LCU termine
   useEffect(() => {
     setLoading(true)
     window.electronAPI.invoke(IPC.RANKED_HISTORY, tab)
       .then((data) => setGames((data as RankedGame[]) ?? []))
       .catch(() => setGames([]))
       .finally(() => setLoading(false))
-  }, [tab])
+  }, [tab, refreshKey])
+
+  // Écouter la fin de l'import automatique pour rafraîchir sans action utilisateur
+  useEffect(() => {
+    const onImportDone = () => setRefreshKey((k) => k + 1)
+    window.electronAPI.on(IPC.RANKED_IMPORT_DONE, onImportDone)
+    return () => window.electronAPI.removeListener(IPC.RANKED_IMPORT_DONE, onImportDone)
+  }, [])
 
   // Génère (ou toggle) la review d'une partie
   async function handleAnalyse(gameId: number) {

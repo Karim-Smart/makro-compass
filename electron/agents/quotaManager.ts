@@ -60,6 +60,18 @@ function getDb(): Database.Database {
     // Colonne déjà présente, on ignore
   }
 
+  // Migration : ajouter game_id pour déduplication des imports LCU
+  try {
+    db.exec(`ALTER TABLE ranked_games ADD COLUMN game_id TEXT`)
+  } catch {
+    // Colonne déjà présente, on ignore
+  }
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_ranked_game_id
+    ON ranked_games(game_id)
+    WHERE game_id IS NOT NULL
+  `)
+
   // Insérer la ligne de quota si elle n'existe pas
   const tomorrow = Date.now() + 86_400_000
   db.prepare(`
@@ -259,6 +271,72 @@ export function saveRankedGame(
     console.log(`[QuotaManager] Partie classée sauvegardée — ${gameData.champion} ${result} (${queueType})`)
   } catch (err) {
     console.error('[QuotaManager] Erreur sauvegarde ranked:', (err as Error).message)
+  }
+}
+
+/**
+ * Sauvegarde directe d'une partie à partir de données brutes (import LCU).
+ * Utilise INSERT OR IGNORE sur game_id pour éviter les doublons.
+ * Retourne true si la partie a été insérée, false si elle existait déjà.
+ */
+export function saveRankedGameDirect(data: {
+  gameId: string
+  timestamp: number
+  queueType: RankedQueueType
+  champion: string
+  kills: number
+  deaths: number
+  assists: number
+  cs: number
+  gold: number
+  gameTime: number
+  teamKills: number
+  enemyKills: number
+  wardScore: number
+  level: number
+  items: string[]
+  allies: string[]
+  enemies: string[]
+  result: 'win' | 'loss'
+}): boolean {
+  try {
+    const roast = generateRoast(
+      data.result, data.kills, data.deaths, data.assists,
+      data.cs, data.gameTime, data.teamKills, data.wardScore,
+    )
+
+    const stmt = getDb().prepare(`
+      INSERT OR IGNORE INTO ranked_games (
+        game_id, timestamp, queue_type, champion, kills, deaths, assists,
+        cs, gold, game_time, team_kills, enemy_kills,
+        ward_score, level, items, allies, enemies, result, roast
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+
+    const res = stmt.run(
+      data.gameId,
+      data.timestamp,
+      data.queueType,
+      data.champion,
+      data.kills, data.deaths, data.assists,
+      data.cs, data.gold, Math.floor(data.gameTime),
+      data.teamKills, data.enemyKills,
+      data.wardScore, data.level,
+      JSON.stringify(data.items),
+      JSON.stringify(data.allies),
+      JSON.stringify(data.enemies),
+      data.result,
+      roast,
+    )
+
+    if (res.changes > 0) {
+      console.log(`[QuotaManager] Partie importée — ${data.champion} ${data.result} (${data.queueType})`)
+      return true
+    }
+    return false  // déjà présente
+  } catch (err) {
+    console.error('[QuotaManager] Erreur import direct:', (err as Error).message)
+    return false
   }
 }
 
