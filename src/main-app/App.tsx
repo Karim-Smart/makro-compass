@@ -189,7 +189,7 @@ function App() {
             <NavLink
               key={path}
               to={path}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold transition-all duration-150 relative"
+              className="nav-link-hover flex items-center gap-1.5 px-3 py-2 text-xs font-semibold relative"
               style={({ isActive }) => ({
                 color: isActive ? 'var(--hextech-gold)' : 'var(--hextech-silver)',
                 opacity: isActive ? 1 : 0.6,
@@ -197,36 +197,41 @@ function App() {
             >
               {({ isActive }) => (
                 <>
-                  <span style={{ color: isActive ? 'var(--hextech-gold)' : 'currentColor' }}>
+                  <span style={{
+                    color: isActive ? 'var(--hextech-gold)' : 'currentColor',
+                    transition: 'color 0.15s ease',
+                  }}>
                     <Icon />
                   </span>
                   {label}
-                  {/* Bordure basse dorée active */}
-                  {isActive && (
-                    <div
-                      className="absolute bottom-0 left-2 right-2 h-0.5"
-                      style={{ background: 'linear-gradient(90deg, transparent, var(--hextech-gold), transparent)' }}
-                    />
-                  )}
+                  {/* Bordure basse dorée animée */}
+                  <div
+                    className="absolute bottom-0 left-2 right-2 h-0.5"
+                    style={{
+                      background: 'linear-gradient(90deg, transparent, var(--hextech-gold), transparent)',
+                      transform: isActive ? 'scaleX(1)' : 'scaleX(0)',
+                      transition: 'transform 0.2s ease',
+                    }}
+                  />
                 </>
               )}
             </NavLink>
           ))}
         </nav>
 
-        {/* ── Contenu ── */}
+        {/* ── Contenu avec transition de page ── */}
         <main className="flex-1 overflow-hidden">
           <Routes>
             <Route path="/"          element={<Navigate to="/dashboard" replace />} />
-            <Route path="/style"     element={<StylePicker />} />
-            <Route path="/profile"   element={<Profile />} />
-            <Route path="/draft"     element={<Draft />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/runes"     element={<Runes />} />
-            <Route path="/build"     element={<Build />} />
-            <Route path="/stats"     element={<Stats />} />
-            <Route path="/pricing"   element={<Pricing />} />
-            <Route path="/settings"  element={<Settings />} />
+            <Route path="/style"     element={<div className="page-enter h-full"><StylePicker /></div>} />
+            <Route path="/profile"   element={<div className="page-enter h-full"><Profile /></div>} />
+            <Route path="/draft"     element={<div className="page-enter h-full"><Draft /></div>} />
+            <Route path="/dashboard" element={<div className="page-enter h-full"><Dashboard /></div>} />
+            <Route path="/runes"     element={<div className="page-enter h-full"><Runes /></div>} />
+            <Route path="/build"     element={<div className="page-enter h-full"><Build /></div>} />
+            <Route path="/stats"     element={<div className="page-enter h-full"><Stats /></div>} />
+            <Route path="/pricing"   element={<div className="page-enter h-full"><Pricing /></div>} />
+            <Route path="/settings"  element={<div className="page-enter h-full"><Settings /></div>} />
           </Routes>
         </main>
 

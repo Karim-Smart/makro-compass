@@ -103,3 +103,39 @@
 .stat-value {
   transition: color 0.3s ease;
 }
+
+/* Smooth urgency transition pour timers */
+.timer-urgency {
+  transition: color 0.5s ease, text-shadow 0.5s ease;
+}
+
+/* Timer urgent glow */
+.timer-urgent {
+  text-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+}
+
+/* Timer warning glow */
+.timer-warning {
+  text-shadow: 0 0 4px rgba(245, 158, 11, 0.4);
+}
+
+/* Smooth card entry */
+@keyframes cardEnter {
+  from { opacity: 0; transform: translateX(8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.animate-card-enter {
+  animation: cardEnter 0.3s ease-out;
+}
+
+/* Level up flash */
+@keyframes levelFlash {
+  0%   { text-shadow: 0 0 0 transparent; }
+  30%  { text-shadow: 0 0 8px rgba(200, 155, 60, 0.8); }
+  100% { text-shadow: 0 0 0 transparent; }
+}
+
+.level-flash {
+  animation: levelFlash 0.6s ease-out;
+}

@@ -86,16 +86,17 @@ export default function Pricing() {
       </div>
 
       {/* 3 colonnes de prix */}
-      <div className="grid grid-cols-3 gap-4 max-w-3xl mx-auto mb-8">
+      <div className="grid grid-cols-3 gap-4 max-w-3xl mx-auto mb-8 stagger-enter">
         {tiers.map(({ key, accent, border }) => {
           const isCurrent = key === currentTier
+          const isElite = key === 'elite'
           const price = TIER_PRICING[key]
           const label = TIER_LABELS[key]
 
           return (
             <div
               key={key}
-              className="clip-bevel-lg p-5 flex flex-col items-center gap-3 transition-all"
+              className={`clip-bevel-lg p-5 flex flex-col items-center gap-3 transition-all ${isElite && !isCurrent ? 'gold-pulse' : ''}`}
               style={{
                 backgroundColor: `${c.bg}`,
                 border: `2px solid ${isCurrent ? accent : border}`,

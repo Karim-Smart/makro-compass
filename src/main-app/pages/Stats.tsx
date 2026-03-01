@@ -330,7 +330,7 @@ export default function Stats() {
           </div>
 
         ) : (
-          <div className="space-y-2.5">
+          <div className="space-y-2.5 stagger-enter">
             {games.map((game) => {
               const isWin = game.result === 'win'
               const kda = game.deaths === 0

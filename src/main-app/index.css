@@ -149,9 +149,91 @@
   box-shadow: 0 0 0 4px var(--accent, #4a9fff), 0 0 0 6px rgba(0,0,0,0.4);
 }
 
+/* ─── Animations page transitions ──────────────────────────────────────────── */
+
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.page-enter {
+  animation: pageEnter 0.25s ease-out;
+}
+
+/* ─── Animations composants ────────────────────────────────────────────────── */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in { animation: fadeIn 0.3s ease-out; }
+.animate-slide-up { animation: slideUp 0.3s ease-out; }
+
+/* Cards avec hover lift */
+.hextech-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hextech-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 20px rgba(200, 155, 60, 0.12), inset 0 1px 0 rgba(200, 155, 60, 0.15);
+}
+
+/* Nav underline animée */
+.nav-underline {
+  position: absolute;
+  bottom: 0;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--hextech-gold), transparent);
+  transform: scaleX(0);
+  transition: transform 0.2s ease;
+}
+
+.nav-active .nav-underline {
+  transform: scaleX(1);
+}
+
+/* Nav link hover glow */
+.nav-link-hover {
+  transition: color 0.15s ease, opacity 0.15s ease, text-shadow 0.15s ease;
+}
+.nav-link-hover:hover {
+  opacity: 0.85 !important;
+  text-shadow: 0 0 8px rgba(200, 155, 60, 0.3);
+}
+
+/* Gold glow pulse pour éléments importants */
+@keyframes goldPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(200, 155, 60, 0.15); }
+  50%      { box-shadow: 0 0 16px rgba(200, 155, 60, 0.3); }
+}
+.gold-pulse {
+  animation: goldPulse 2s ease-in-out infinite;
+}
+
+/* Staggered entry pour listes */
+.stagger-enter > * {
+  opacity: 0;
+  animation: slideUp 0.3s ease-out forwards;
+}
+.stagger-enter > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-enter > *:nth-child(2) { animation-delay: 50ms; }
+.stagger-enter > *:nth-child(3) { animation-delay: 100ms; }
+.stagger-enter > *:nth-child(4) { animation-delay: 150ms; }
+.stagger-enter > *:nth-child(5) { animation-delay: 200ms; }
+.stagger-enter > *:nth-child(6) { animation-delay: 250ms; }
+
 /* Focus visible amélioré */
 *:focus-visible {
-  outline: 2px solid rgba(74, 159, 255, 0.6);
+  outline: 2px solid rgba(200, 155, 60, 0.5);
   outline-offset: 2px;
 }
 
@@ -159,4 +241,12 @@
 select option {
   background: #0d1117;
   color: #e5e7eb;
+}
+
+/* Smooth transitions pour boutons */
+button {
+  transition: transform 0.1s ease, opacity 0.15s ease;
+}
+button:active {
+  transform: scale(0.97);
 }

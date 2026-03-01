@@ -155,17 +155,18 @@ export function AdviceOverlay({ advice, colors, queuePos, queueTotal, rotateKey,
         </div>
       </div>
 
-      {/* Dots indicateurs */}
+      {/* Dots indicateurs avec transition smooth */}
       {queueTotal > 1 && (
         <div className="flex items-center justify-center gap-1 pb-2">
           {Array.from({ length: queueTotal }, (_, i) => (
             <div
               key={i}
-              className="rounded-full transition-all"
+              className="rounded-full"
               style={{
                 width: i === queuePos - 1 ? 10 : 4,
                 height: 4,
                 backgroundColor: i === queuePos - 1 ? colors.accent : `${colors.accent}30`,
+                transition: 'width 0.3s ease, background-color 0.3s ease',
               }}
             />
           ))}

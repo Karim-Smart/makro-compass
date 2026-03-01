@@ -594,7 +594,7 @@ export default function Profile() {
                   {recent20.length} parties analysées
                 </span>
               </div>
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2 stagger-enter">
                 {insights.map((insight, i) => {
                   const insightColor = insight.type === 'warning' ? '#ef4444'
                     : insight.type === 'success' ? '#22c55e'

@@ -186,7 +186,7 @@ export default function Dashboard() {
 
       {/* ─── STATS EN PARTIE ─── */}
       {isInGame && gameData ? (
-        <div className="grid grid-cols-5 gap-2 flex-shrink-0">
+        <div className="grid grid-cols-5 gap-2 flex-shrink-0 stagger-enter">
           {[
             {
               label: 'KDA',
@@ -203,7 +203,7 @@ export default function Dashboard() {
           ].map(({ label, value, sub, accentOverride }) => (
             <div
               key={label}
-              className="clip-bevel px-3 py-3 text-center"
+              className="clip-bevel px-3 py-3 text-center hextech-card"
               style={{
                 background: `linear-gradient(160deg, ${c.bg} 0%, ${c.border}50 100%)`,
                 border: `1px solid ${c.border}`,

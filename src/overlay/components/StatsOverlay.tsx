@@ -10,6 +10,8 @@ export function StatsOverlay({ gameData, colors }: Props) {
   // Horloge interne lisse : interpolation entre les polls (tous les 5s)
   const [displayTime, setDisplayTime] = useState(gameData.gameTime)
   const baseRef = useRef({ gameTime: gameData.gameTime, receivedAt: Date.now() })
+  const [levelFlash, setLevelFlash] = useState(false)
+  const prevLevelRef = useRef(gameData.level)
 
   useEffect(() => {
     baseRef.current = { gameTime: gameData.gameTime, receivedAt: Date.now() }
@@ -24,6 +26,17 @@ export function StatsOverlay({ gameData, colors }: Props) {
     return () => clearInterval(id)
   }, [])
 
+  // Détection level up → flash doré
+  useEffect(() => {
+    if (gameData.level > prevLevelRef.current) {
+      setLevelFlash(true)
+      const t = setTimeout(() => setLevelFlash(false), 600)
+      prevLevelRef.current = gameData.level
+      return () => clearTimeout(t)
+    }
+    prevLevelRef.current = gameData.level
+  }, [gameData.level])
+
   const csPerMin = displayTime > 0
     ? (gameData.cs / (displayTime / 60)).toFixed(1)
     : '0.0'
@@ -36,8 +49,9 @@ export function StatsOverlay({ gameData, colors }: Props) {
   const seconds = Math.floor(displayTime % 60)
   const timeStr = `${minutes}:${String(seconds).padStart(2, '0')}`
 
-  // Phase de jeu
+  // Phase de jeu avec couleur contextuelle
   const phase = displayTime < 840 ? 'EARLY' : displayTime < 1500 ? 'MID' : 'LATE'
+  const phaseColor = phase === 'EARLY' ? '#22c55e' : phase === 'MID' ? '#f59e0b' : '#ef4444'
 
   // Kill participation
   const kp = gameData.teamKills > 0
@@ -60,12 +74,14 @@ export function StatsOverlay({ gameData, colors }: Props) {
       main:  `${csPerMin}`,
       sub:   `${gameData.cs} CS · ${kp}% KP`,
       mainColor: colors.text,
+      labelColor: phaseColor,
     },
     {
       label: `Niv ${gameData.level}`,
       main:  `${(gameData.gold / 1000).toFixed(1)}k`,
       sub:   gameData.champion,
       mainColor: colors.text,
+      className: levelFlash ? 'level-flash' : '',
     },
   ]
 
@@ -76,13 +92,16 @@ export function StatsOverlay({ gameData, colors }: Props) {
       className="overflow-hidden animate-fade-in"
     >
       <div className="flex">
-        {cols.map(({ label, main, sub, mainColor }, i) => (
+        {cols.map(({ label, main, sub, mainColor, labelColor, className: extraClass }, i) => (
           <div
             key={i}
-            className="px-3 py-2 text-center flex-1"
+            className={`px-3 py-2 text-center flex-1 ${extraClass ?? ''}`}
             style={i > 0 ? { borderLeft: `1px solid ${colors.border}50` } : {}}
           >
-            <div className="text-[8px] font-black uppercase tracking-[0.15em] mb-0.5" style={{ color: colors.accent, opacity: 0.5 }}>
+            <div
+              className="text-[8px] font-black uppercase tracking-[0.15em] mb-0.5"
+              style={{ color: labelColor ?? colors.accent, opacity: 0.5, transition: 'color 0.5s ease' }}
+            >
               {label}
             </div>
             <div className="text-xs font-mono font-black leading-tight stat-value" style={{ color: mainColor }}>

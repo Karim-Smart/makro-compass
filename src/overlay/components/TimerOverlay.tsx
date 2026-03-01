@@ -92,11 +92,10 @@ export function TimerOverlay({ timers, colors }: Props) {
 
               {isDead ? (
                 <span
-                  className="text-xs font-mono font-black"
+                  className={`text-xs font-mono font-black timer-urgency ${urgencyColor === '#ef4444' ? 'timer-urgent' : urgencyColor === '#f59e0b' ? 'timer-warning' : ''}`}
                   style={{
                     color: urgencyColor,
                     animation: urgencyColor === '#ef4444' ? 'pulseOpacity 0.8s ease-in-out infinite' : 'none',
-                    transition: 'color 0.5s ease',
                   }}
                 >
                   ⟳ {text}
