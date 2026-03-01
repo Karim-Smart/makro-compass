@@ -320,7 +320,7 @@ export default function OverlayApp() {
 
       {panel === 'timers' && inGame && (
         <div className="space-y-1 overlay-glass h-full">
-          {timers && <TimerOverlay timers={timers} colors={colors} />}
+          {timers && <TimerOverlay timers={timers} colors={colors} gameData={gameData ?? undefined} />}
           <ItemsOverlay gameData={gameData!} colors={colors} />
         </div>
       )}
@@ -362,6 +362,10 @@ export default function OverlayApp() {
                   queueTotal={adviceQueue.length}
                   rotateKey={rotateKey}
                   onMinimize={() => setAdviceMinimized(true)}
+                  onSkip={adviceQueue.length > 1 ? () => {
+                    setAdviceIdx((prev) => (prev + 1) % adviceQueue.length)
+                    setRotateKey((k) => k + 1)
+                  } : undefined}
                 />
               )}
 

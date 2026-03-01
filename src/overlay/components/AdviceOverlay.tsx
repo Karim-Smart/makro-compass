@@ -7,6 +7,7 @@ interface Props {
   queueTotal: number
   rotateKey: number
   onMinimize?: () => void
+  onSkip?: () => void
 }
 
 const PRIORITY_META = {
@@ -43,13 +44,13 @@ const CATEGORY_BADGE: Record<string, { label: string; color: string }> = {
   'item-spike':     { label: 'ITEM',     color: '#f59e0b' },
 }
 
-export function AdviceOverlay({ advice, colors, queuePos, queueTotal, rotateKey, onMinimize }: Props) {
+export function AdviceOverlay({ advice, colors, queuePos, queueTotal, rotateKey, onMinimize, onSkip }: Props) {
   const meta = PRIORITY_META[advice.priority as P] ?? PRIORITY_META.medium
   const catBadge = advice.category ? CATEGORY_BADGE[advice.category] : undefined
 
   return (
     <div
-      className="w-80 overflow-hidden animate-slide-up"
+      className="w-[360px] overflow-hidden animate-slide-up"
       style={{
         background: '#0A1628',
         border: `1px solid rgba(200, 155, 60, 0.2)`,
@@ -101,6 +102,25 @@ export function AdviceOverlay({ advice, colors, queuePos, queueTotal, rotateKey,
             <span className="text-[9px] font-mono opacity-30 text-white">
               {Math.floor(advice.gameTime / 60)}:{String(advice.gameTime % 60).padStart(2, '0')}
             </span>
+            {/* Skip button */}
+            {onSkip && queueTotal > 1 && (
+              <button
+                onClick={onSkip}
+                className="text-[10px] font-bold leading-none opacity-40 hover:opacity-80 transition-opacity"
+                title="Conseil suivant"
+                style={{
+                  color: colors.accent,
+                  // @ts-expect-error: propriété CSS Electron pour désactiver le drag
+                  WebkitAppRegion: 'no-drag',
+                  cursor: 'pointer',
+                  background: 'none',
+                  border: 'none',
+                  padding: '0 2px',
+                }}
+              >
+                ⏭
+              </button>
+            )}
             {/* Minimize button */}
             {onMinimize && (
               <button

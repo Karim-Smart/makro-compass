@@ -141,11 +141,11 @@ function createPanelWindow(spec: OverlaySpec): BrowserWindow {
 export function createOverlayWindows(): BrowserWindow[] {
   const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize
 
-  // Stats — haut gauche (plus large pour KDA + CS + Gold + timer + matchup)
+  // Stats — haut gauche (KDA + CS + Gold + timer + matchup + vision)
   statsWindow = createPanelWindow({
     panel: 'stats',
-    width: 280,
-    height: 90,
+    width: 320,
+    height: 110,
     x: 10,
     y: 10,
   })
@@ -161,12 +161,12 @@ export function createOverlayWindows(): BrowserWindow[] {
   })
   timersWindow.on('closed', () => { timersWindow = null })
 
-  // Advice — haut droite
+  // Advice — haut droite (élargi pour meilleur texte)
   adviceWindow = createPanelWindow({
     panel: 'advice',
-    width: 340,
-    height: 160,
-    x: sw - 360,
+    width: 380,
+    height: 170,
+    x: sw - 400,
     y: 10,
   })
   adviceWindow.on('closed', () => { adviceWindow = null })

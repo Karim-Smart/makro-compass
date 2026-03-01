@@ -62,7 +62,15 @@ export function StatsOverlay({ gameData, colors }: Props) {
   const kdaNum = gameData.kda.deaths === 0 ? 10 : (gameData.kda.kills + gameData.kda.assists) / gameData.kda.deaths
   const kdaColor = kdaNum >= 4 ? '#22c55e' : kdaNum >= 2 ? colors.text : '#ef4444'
 
-  const cols = [
+  // Gold diff team
+  const goldDiff = gameData.teamGold - gameData.enemyGold
+  const goldDiffStr = goldDiff >= 0 ? `+${(goldDiff / 1000).toFixed(1)}k` : `${(goldDiff / 1000).toFixed(1)}k`
+  const goldDiffColor = goldDiff >= 0 ? '#22c55e' : '#ef4444'
+
+  // Ward score per minute
+  const wardPerMin = displayTime > 0 ? (gameData.wardScore / (displayTime / 60)).toFixed(1) : '0.0'
+
+  const cols: { label: string; main: string; sub: string; mainColor: string; labelColor?: string; className?: string }[] = [
     {
       label: timeStr,
       main:  `${gameData.kda.kills}/${gameData.kda.deaths}/${gameData.kda.assists}`,
@@ -79,9 +87,15 @@ export function StatsOverlay({ gameData, colors }: Props) {
     {
       label: `Niv ${gameData.level}`,
       main:  `${(gameData.gold / 1000).toFixed(1)}k`,
-      sub:   gameData.champion,
+      sub:   `${goldDiffStr} diff`,
       mainColor: colors.text,
       className: levelFlash ? 'level-flash' : '',
+    },
+    {
+      label: 'Vision',
+      main:  `${wardPerMin}/m`,
+      sub:   `${gameData.wardScore} score`,
+      mainColor: colors.text,
     },
   ]
 
@@ -122,7 +136,7 @@ export function StatsOverlay({ gameData, colors }: Props) {
             {matchup.isDead ? (
               <div className="flex-1 px-3 py-1 text-center">
                 <span className="text-[8px] font-mono animate-pulse" style={{ color: '#ef4444' }}>
-                  💀 {matchup.champion} — {Math.round(matchup.respawnTimer)}s
+                  💀 {matchup.champion} — {Math.round(matchup.respawnTimer)}s respawn
                 </span>
               </div>
             ) : (
@@ -148,10 +162,18 @@ export function StatsOverlay({ gameData, colors }: Props) {
                   className="px-3 py-1 text-center flex-1"
                   style={{ borderLeft: `1px solid ${colors.border}30` }}
                 >
-                  <div className="text-[8px] font-mono font-bold leading-none" style={{ color: '#ef4444' }}>
-                    {matchup.oppCs}
-                  </div>
-                  <div className="text-[7px] font-mono mt-0.5" style={{ color: '#ef444480' }}>CS</div>
+                  {(() => {
+                    const csDiff = gameData.cs - matchup.oppCs
+                    const csDiffColor = csDiff >= 0 ? '#22c55e' : '#ef4444'
+                    return (
+                      <>
+                        <div className="text-[8px] font-mono font-bold leading-none" style={{ color: csDiffColor }}>
+                          {csDiff >= 0 ? `+${csDiff}` : csDiff}
+                        </div>
+                        <div className="text-[7px] font-mono mt-0.5" style={{ color: '#ef444480' }}>CS diff</div>
+                      </>
+                    )
+                  })()}
                 </div>
               </>
             )}

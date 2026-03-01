@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import type { ObjectiveTimers } from '../../../shared/types'
+import type { ObjectiveTimers, GameData } from '../../../shared/types'
 
 interface Props {
   timers: ObjectiveTimers
   colors: { bg: string; text: string; accent: string; border: string }
+  gameData?: GameData
 }
 
 function useNow(interval = 500) {
@@ -44,7 +45,7 @@ const OBJECTIVES = [
   { key: 'herald' as const, label: 'Herald',  icon: '🟡', alwaysShow: false },
 ]
 
-export function TimerOverlay({ timers, colors }: Props) {
+export function TimerOverlay({ timers, colors, gameData }: Props) {
   const now = useNow()
 
   const active = OBJECTIVES.filter(({ key, alwaysShow }) => {
@@ -66,6 +67,45 @@ export function TimerOverlay({ timers, colors }: Props) {
       >
         Objectifs
       </div>
+
+      {/* Dragon soul counter */}
+      {gameData && gameData.objectives.dragonStacks > 0 && (
+        <div className="px-3 pt-1.5 pb-0.5 flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            {Array.from({ length: 4 }, (_, i) => (
+              <div
+                key={i}
+                className="w-2 h-2 rounded-sm"
+                style={{
+                  backgroundColor: i < gameData.objectives.dragonStacks ? '#C89B3C' : `${colors.border}50`,
+                  transition: 'background-color 0.3s ease',
+                }}
+              />
+            ))}
+          </div>
+          <span className="text-[7px] font-mono font-bold" style={{ color: colors.accent, opacity: 0.6 }}>
+            {gameData.objectives.dragonStacks}/4
+            {gameData.objectives.dragonSoul ? ` ${gameData.objectives.dragonSoul}` : ' soul'}
+          </span>
+        </div>
+      )}
+
+      {/* Team score */}
+      {gameData && (
+        <div className="px-3 pb-1 flex items-center justify-between">
+          <span className="text-[8px] font-mono font-bold" style={{ color: '#22c55e' }}>
+            {gameData.teamKills}
+          </span>
+          <span className="text-[7px] font-mono" style={{ color: colors.text, opacity: 0.3 }}>
+            KILLS
+          </span>
+          <span className="text-[8px] font-mono font-bold" style={{ color: '#ef4444' }}>
+            {gameData.enemyKills}
+          </span>
+        </div>
+      )}
+
+      <div style={{ height: 1, backgroundColor: `${colors.border}25` }} />
 
       <div className="px-3 py-2 space-y-1.5">
         {active.map(({ key, label, icon }) => {
