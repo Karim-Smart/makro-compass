@@ -28,6 +28,13 @@ let csPmHistory: number[] = [] // CS/min snapshots pour détecter les drops
 let lastCsDropAlert    = 0    // gameTime du dernier rappel CS drop
 let prevDeathCount     = -1
 let lastDeathAlert     = 0    // gameTime de la dernière alerte mort
+let deathTimestamps: number[] = []  // timestamps des morts pour tilt detection
+let lastTiltAlert      = 0    // gameTime du dernier rappel tilt
+let prevOppCs          = 0    // CS de l'adversaire pour détecter le farm gap
+let lastFarmGapAlert   = 0    // gameTime du dernier rappel farm gap
+let prevKills          = 0    // kills du joueur pour détecter les streaks
+let lastKillStreakAlert = 0
+let prevObjVisionAlert = 0    // gameTime du dernier rappel vision objectif
 
 // ─── API publique ────────────────────────────────────────────────────────────
 
@@ -52,6 +59,13 @@ export function resetAlertEngine(): void {
   lastCsDropAlert  = 0
   prevDeathCount   = -1
   lastDeathAlert   = 0
+  deathTimestamps.length = 0
+  lastTiltAlert    = 0
+  prevOppCs        = 0
+  lastFarmGapAlert = 0
+  prevKills        = 0
+  lastKillStreakAlert = 0
+  prevObjVisionAlert = 0
 }
 
 /**
@@ -256,6 +270,80 @@ export function detectAlerts(gameData: GameData): GameAlert[] {
     lastDeathAlert = gameTime
   }
   prevDeathCount = deaths
+
+  // ─── TILT DETECTION (morts rapprochées) ───────────────────────
+
+  if (deaths > 0 && prevDeathCount >= 0 && deaths > prevDeathCount) {
+    deathTimestamps.push(gameTime)
+    // Garder seulement les 2 dernières minutes
+    while (deathTimestamps.length > 0 && gameTime - deathTimestamps[0] > 120) {
+      deathTimestamps.shift()
+    }
+  }
+
+  if (deathTimestamps.length >= 3 && gameTime - lastTiltAlert >= 180) {
+    // 3+ morts en 2 minutes = potentiel tilt
+    const recentDeaths = deathTimestamps.filter(t => gameTime - t <= 120).length
+    if (recentDeaths >= 3) {
+      alerts.push({ text: `🧊 ${recentDeaths} morts en 2 min — RESPIRE. Farm safe, ne force rien`, type: 'danger' })
+      lastTiltAlert = gameTime
+    }
+  }
+
+  // ─── KILL STREAK DETECTION ────────────────────────────────────
+
+  const myKills = gameData.kda.kills
+  if (prevKills >= 0 && myKills > prevKills) {
+    const killsGained = myKills - prevKills
+    if (myKills >= 5 && killsGained >= 1 && gameTime - lastKillStreakAlert >= 60) {
+      if (myKills >= 8) {
+        alerts.push({ text: `🔥 GODLIKE — ${myKills} kills ! Convertis en objectifs, ne greed pas`, type: 'success' })
+      } else {
+        alerts.push({ text: `🔥 On fire (${myKills} kills) — attention à ta bounty, joue smart`, type: 'success' })
+      }
+      lastKillStreakAlert = gameTime
+    }
+  }
+  prevKills = myKills
+
+  // ─── FARM GAP WIDENING ───────────────────────────────────────
+
+  if (matchup && gameTime >= 300 && gameTime - lastFarmGapAlert >= 120) {
+    const csDiff = gameData.cs - matchup.oppCs
+    const prevDiff = prevCs - prevOppCs
+
+    // Le gap se creuse en notre défaveur (on perd 15+ CS en 30s)
+    if (prevOppCs > 0 && prevDiff > csDiff + 15 && csDiff < -20) {
+      alerts.push({ text: `📉 Farm gap qui se creuse (-${Math.abs(csDiff)} CS) — priorise les last hits`, type: 'warning' })
+      lastFarmGapAlert = gameTime
+    }
+    // L'ennemi nous rattrape alors qu'on était ahead
+    if (prevDiff >= 20 && csDiff < 10 && prevOppCs > 0) {
+      alerts.push({ text: `⚠️ L'ennemi rattrape ton avance CS — ne laisse pas les vagues crash`, type: 'warning' })
+      lastFarmGapAlert = gameTime
+    }
+    prevOppCs = matchup.oppCs
+  } else if (matchup) {
+    prevOppCs = matchup.oppCs
+  }
+
+  // ─── VISION WARNING BEFORE OBJECTIVES ─────────────────────────
+
+  if (gameTime >= 240 && gameTime - prevObjVisionAlert >= 120) {
+    const wardPerMin = gameTime > 0 ? (wardScore / (gameTime / 60)) : 0
+    const isLowVision = wardPerMin < 0.35
+
+    // Drake spawn dans ~60s et vision basse
+    const drakeSpawnsSoon = (gameTime >= 240 && gameTime < 300 && (300 - gameTime) <= 60)
+    // Baron spawn dans ~90s et vision basse
+    const baronSpawnsSoon = (gameTime >= 1110 && gameTime < 1200 && (1200 - gameTime) <= 90)
+
+    if (isLowVision && (drakeSpawnsSoon || baronSpawnsSoon)) {
+      const obj = baronSpawnsSoon ? 'Baron' : 'Drake'
+      alerts.push({ text: `👁 ${obj} bientôt — ta vision est trop basse ! Place des wards maintenant`, type: 'warning' })
+      prevObjVisionAlert = gameTime
+    }
+  }
 
   return alerts
 }
