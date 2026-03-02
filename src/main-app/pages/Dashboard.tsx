@@ -276,7 +276,7 @@ export default function Dashboard() {
                 {form.map((w, i) => (
                   <div
                     key={i}
-                    className="w-2.5 h-4 rounded-sm"
+                    className="w-2.5 h-4 clip-bevel-sm"
                     style={{
                       backgroundColor: w === 1 ? '#22c55e' : '#ef4444',
                       opacity: 0.7,
@@ -351,13 +351,13 @@ export default function Dashboard() {
             </p>
             <div className="flex items-center gap-2 mt-3 flex-wrap">
               <span
-                className="text-[9px] font-black px-2 py-0.5 rounded tracking-widest"
+                className="text-[9px] font-black px-2 py-0.5 clip-bevel-sm tracking-widest"
                 style={{ backgroundColor: `${c.accent}20`, color: c.accent }}
               >
                 {lastAdvice.style}
               </span>
               <span
-                className="text-[9px] font-bold px-2 py-0.5 rounded"
+                className="text-[9px] font-bold px-2 py-0.5 clip-bevel-sm"
                 style={{ backgroundColor: pMeta.bg, color: pMeta.color }}
               >
                 {pMeta.label}
@@ -394,7 +394,7 @@ export default function Dashboard() {
             <span
               className="text-[9px] font-black px-2 py-0.5 clip-bevel-sm tracking-widest uppercase"
               style={{
-                backgroundColor: tier === 'elite' ? '#FFD700' : tier === 'pro' ? '#9B6EF3' : c.accent,
+                backgroundColor: tier === 'elite' ? '#FFD700' : tier === 'pro' ? '#C89B3C' : c.accent,
                 color: tier === 'elite' ? '#000' : tier === 'pro' ? '#fff' : c.bg,
               }}
             >
@@ -425,7 +425,7 @@ export default function Dashboard() {
             <button
               onClick={() => navigate('/pricing')}
               className="mt-2 w-full py-1.5 clip-bevel-sm text-[10px] font-bold transition-all hover:scale-[1.02]"
-              style={{ backgroundColor: '#9B6EF320', color: '#9B6EF3', border: '1px solid #9B6EF340' }}
+              style={{ backgroundColor: '#C89B3C20', color: '#C89B3C', border: '1px solid #C89B3C40' }}
             >
               Passer à Pro
             </button>
@@ -450,7 +450,7 @@ export default function Dashboard() {
               Overlay
             </div>
             <kbd
-              className="text-[9px] px-1.5 py-0.5 rounded font-mono border"
+              className="text-[9px] px-1.5 py-0.5 clip-bevel-sm font-mono border"
               style={{ borderColor: c.border, color: c.text, opacity: 0.35 }}
             >
               {settings.hotkey}
@@ -475,7 +475,7 @@ export default function Dashboard() {
           {/* Panneaux actifs */}
           <div className="flex items-center gap-1 mt-2 flex-wrap">
             {isVisible && enabledPanels.map(p => (
-              <span key={p} className="text-[8px] px-1.5 py-0.5 rounded font-mono" style={{ backgroundColor: `${c.accent}15`, color: c.accent }}>
+              <span key={p} className="text-[8px] px-1.5 py-0.5 clip-bevel-sm font-mono" style={{ backgroundColor: `${c.accent}15`, color: c.accent }}>
                 {p}
               </span>
             ))}

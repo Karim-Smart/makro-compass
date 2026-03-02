@@ -41,7 +41,7 @@ export default function DraftOraclePanel({ myTeam, theirTeam, assignedPosition, 
   return (
     <FeatureLock feature="draft_oracle">
       <div
-        className="rounded-xl overflow-hidden"
+        className="clip-bevel-lg overflow-hidden"
         style={{ border: `1px solid ${c.border}`, background: `linear-gradient(160deg, ${c.bg} 0%, ${c.border}30 100%)` }}
       >
         {/* Header */}
@@ -58,14 +58,14 @@ export default function DraftOraclePanel({ myTeam, theirTeam, assignedPosition, 
             <span className="text-xs font-black uppercase tracking-wider" style={{ color: c.accent }}>
               AI Draft Oracle
             </span>
-            <span className="text-[8px] px-1.5 py-0.5 rounded font-black" style={{ backgroundColor: '#9B6EF320', color: '#9B6EF3' }}>
+            <span className="text-[8px] px-1.5 py-0.5 clip-bevel-sm font-black" style={{ backgroundColor: '#C89B3C20', color: '#C89B3C' }}>
               PRO
             </span>
           </div>
           <button
             onClick={handleAnalyze}
             disabled={!canAnalyze || loading}
-            className="px-3 py-1 rounded-lg text-[10px] font-bold transition-all disabled:opacity-30"
+            className="px-3 py-1 clip-bevel-sm text-[10px] font-bold transition-all disabled:opacity-30"
             style={{
               backgroundColor: canAnalyze ? c.accent : `${c.border}50`,
               color: canAnalyze ? c.bg : c.text,
@@ -112,7 +112,7 @@ export default function DraftOraclePanel({ myTeam, theirTeam, assignedPosition, 
                 {result.suggestions.map((s, i) => (
                   <div
                     key={i}
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg"
+                    className="flex items-center gap-2.5 px-3 py-2 clip-bevel-sm"
                     style={{ backgroundColor: `${c.border}30` }}
                   >
                     <span className="font-black text-sm" style={{ color: c.accent }}>{s.champion}</span>

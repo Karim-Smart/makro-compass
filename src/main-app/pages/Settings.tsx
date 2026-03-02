@@ -385,9 +385,9 @@ export default function Settings() {
                   <span
                     className="text-[10px] font-black px-2.5 py-1 clip-bevel-sm uppercase tracking-widest"
                     style={{
-                      backgroundColor: tier === 'elite' ? '#FFD70020' : tier === 'pro' ? '#9B6EF320' : `${c.accent}20`,
-                      color: tier === 'elite' ? '#FFD700' : tier === 'pro' ? '#9B6EF3' : c.accent,
-                      border: `1px solid ${tier === 'elite' ? '#FFD70040' : tier === 'pro' ? '#9B6EF340' : c.accent + '40'}`,
+                      backgroundColor: tier === 'elite' ? '#FFD70020' : tier === 'pro' ? '#C89B3C20' : `${c.accent}20`,
+                      color: tier === 'elite' ? '#FFD700' : tier === 'pro' ? '#C89B3C' : c.accent,
+                      border: `1px solid ${tier === 'elite' ? '#FFD70040' : tier === 'pro' ? '#C89B3C40' : c.accent + '40'}`,
                     }}
                   >
                     {TIER_LABELS[tier]}

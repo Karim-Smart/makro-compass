@@ -486,11 +486,11 @@ export default function Stats() {
                           onClick={() => handleDebrief(game.id)}
                           className="text-[9px] font-bold px-2.5 py-1 clip-bevel-sm transition-all duration-150"
                           style={openDebriefId === game.id ? {
-                            backgroundColor: '#9B6EF3',
+                            backgroundColor: '#C89B3C',
                             color: '#fff',
                           } : {
-                            backgroundColor: '#9B6EF320',
-                            color: '#9B6EF3',
+                            backgroundColor: '#C89B3C20',
+                            color: '#C89B3C',
                           }}
                         >
                           {debriefs[game.id] === 'loading' ? '...' : openDebriefId === game.id ? '▲ Debrief' : 'Debrief IA'}
@@ -553,13 +553,13 @@ export default function Stats() {
                   return (
                     <div
                       className="mt-2 clip-bevel px-4 py-3"
-                      style={{ backgroundColor: `${c.border}25`, border: `1px solid #9B6EF330` }}
+                      style={{ backgroundColor: `${c.border}25`, border: `1px solid #C89B3C30` }}
                     >
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: '#9B6EF3' }}>
+                        <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: '#C89B3C' }}>
                           AI Debrief
                         </span>
-                        <span className="text-[8px] px-1.5 py-0.5 rounded font-black" style={{ backgroundColor: '#9B6EF320', color: '#9B6EF3' }}>
+                        <span className="text-[8px] px-1.5 py-0.5 clip-bevel-sm font-black" style={{ backgroundColor: '#C89B3C20', color: '#C89B3C' }}>
                           PRO
                         </span>
                       </div>

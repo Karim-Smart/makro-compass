@@ -32,9 +32,9 @@ export default function FeatureLock({ feature, children }: FeatureLockProps) {
         <span
           className="px-3 py-1 clip-bevel-sm text-xs font-bold uppercase tracking-wider"
           style={{
-            backgroundColor: needed === 'elite' ? '#FFD70030' : '#9B6EF330',
-            color: needed === 'elite' ? '#FFD700' : '#9B6EF3',
-            border: `1px solid ${needed === 'elite' ? '#FFD70050' : '#9B6EF350'}`,
+            backgroundColor: needed === 'elite' ? '#FFD70030' : '#C89B3C30',
+            color: needed === 'elite' ? '#FFD700' : '#C89B3C',
+            border: `1px solid ${needed === 'elite' ? '#FFD70050' : '#C89B3C50'}`,
           }}
         >
           {label} requis
@@ -43,9 +43,9 @@ export default function FeatureLock({ feature, children }: FeatureLockProps) {
           onClick={() => navigate('/pricing')}
           className="px-4 py-1.5 clip-bevel text-xs font-semibold transition-all hover:scale-105"
           style={{
-            backgroundColor: needed === 'elite' ? '#FFD70020' : '#9B6EF320',
-            color: needed === 'elite' ? '#FFD700' : '#9B6EF3',
-            border: `1px solid ${needed === 'elite' ? '#FFD70040' : '#9B6EF340'}`,
+            backgroundColor: needed === 'elite' ? '#FFD70020' : '#C89B3C20',
+            color: needed === 'elite' ? '#FFD700' : '#C89B3C',
+            border: `1px solid ${needed === 'elite' ? '#FFD70040' : '#C89B3C40'}`,
           }}
         >
           Voir les plans
