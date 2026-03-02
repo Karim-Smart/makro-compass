@@ -6,7 +6,7 @@
 import type { GameData, CoachingStyle, BuildRecommendations, EnemyDamageProfile, RecommendedItem, ChampionBuild } from '../../shared/types'
 import { getChampion } from '../../shared/champion-data'
 import type { ChampionClass } from '../../shared/champion-data'
-import { CLASS_BUILDS, STYLE_BUILD_TIPS } from '../../shared/build-data'
+import { CLASS_BUILDS, STYLE_BUILD_TIPS, HEALING_CHAMPIONS } from '../../shared/build-data'
 
 function analyzeEnemyProfile(enemies: string[]): EnemyDamageProfile {
   let apCount = 0
@@ -18,7 +18,6 @@ function analyzeEnemyProfile(enemies: string[]): EnemyDamageProfile {
   const apClasses: ChampionClass[] = ['mage', 'enchanter']
   const adClasses: ChampionClass[] = ['marksman', 'assassin', 'skirmisher']
   const tankClasses: ChampionClass[] = ['tank', 'engage']
-  const healClasses: ChampionClass[] = ['enchanter']
 
   for (const enemy of enemies) {
     const info = getChampion(enemy)
@@ -27,7 +26,8 @@ function analyzeEnemyProfile(enemies: string[]): EnemyDamageProfile {
     if (apClasses.includes(info.class)) apCount++
     if (adClasses.includes(info.class)) adCount++
     if (tankClasses.includes(info.class)) tankCount++
-    if (healClasses.includes(info.class)) healCount++
+    // Healing detection améliorée : check la liste dédiée + classe enchanter
+    if (HEALING_CHAMPIONS.has(enemy) || info.class === 'enchanter') healCount++
     if (info.class === 'assassin') assassinCount++
   }
 
@@ -48,7 +48,9 @@ function getGamePhase(gameTime: number): 'early' | 'mid' | 'late' {
 function buildChampionBuild(
   champion: string,
   profile: EnemyDamageProfile,
-  style: CoachingStyle
+  style: CoachingStyle,
+  deaths: number = 0,
+  gameTime: number = 0,
 ): ChampionBuild {
   const info = getChampion(champion)
   const champClass: ChampionClass = info?.class ?? 'bruiser'
@@ -61,30 +63,71 @@ function buildChampionBuild(
     situational: false,
   }))
 
+  // ─── Boots adaptatives basées sur le profil ennemi ───────────
+  let bootsItem = classBuild.boots
+  let bootsReason = 'Boots par défaut'
+
+  if (profile.dominantType === 'ap' || (profile.apCount >= 2 && profile.assassinCount >= 1)) {
+    bootsItem = classBuild.bootsAP
+    bootsReason = `Mercury's — ${profile.apCount} AP + CC ennemi`
+  } else if (profile.dominantType === 'ad' || profile.assassinCount >= 2) {
+    bootsItem = classBuild.bootsAD
+    bootsReason = `Steelcaps — ${profile.adCount} AD + ${profile.assassinCount} assassins`
+  }
+
   const boots: RecommendedItem = {
-    name: classBuild.boots.name,
-    itemId: classBuild.boots.itemId,
-    reason: 'Boots',
+    name: bootsItem.name,
+    itemId: bootsItem.itemId,
+    reason: bootsReason,
     situational: false,
   }
 
-  // Choisir l'item situationnel en fonction du profil ennemi
+  // ─── Items situationnels (peut en avoir 2 si nécessaire) ──────
   const situationalItems: RecommendedItem[] = []
+  const addedItemIds = new Set<number>()
 
+  // Priorité 1 : Anti-heal si 2+ healing champions
   if (profile.healCount >= 2) {
     const item = classBuild.situationalHeal[0]
-    situationalItems.push({ name: item.name, itemId: item.itemId, reason: 'Anti-heal (compo heal ennemie)', situational: true })
-  } else if (profile.dominantType === 'ap') {
+    if (!addedItemIds.has(item.itemId)) {
+      situationalItems.push({ name: item.name, itemId: item.itemId, reason: `Anti-heal (${profile.healCount} champs heal)`, situational: true })
+      addedItemIds.add(item.itemId)
+    }
+  }
+
+  // Priorité 2 : Résistance selon le type dominant
+  if (profile.dominantType === 'ap' && situationalItems.length < 2) {
     const item = classBuild.situationalAP[0]
-    situationalItems.push({ name: item.name, itemId: item.itemId, reason: 'Résistance AP (compo AP ennemie)', situational: true })
-  } else if (profile.dominantType === 'ad') {
+    if (!addedItemIds.has(item.itemId)) {
+      situationalItems.push({ name: item.name, itemId: item.itemId, reason: `MR — ${profile.apCount} AP ennemis`, situational: true })
+      addedItemIds.add(item.itemId)
+    }
+  } else if (profile.dominantType === 'ad' && situationalItems.length < 2) {
     const item = classBuild.situationalAD[0]
-    situationalItems.push({ name: item.name, itemId: item.itemId, reason: 'Résistance AD (compo AD ennemie)', situational: true })
-  } else if (profile.dominantType === 'tank') {
+    if (!addedItemIds.has(item.itemId)) {
+      situationalItems.push({ name: item.name, itemId: item.itemId, reason: `Armor — ${profile.adCount} AD ennemis`, situational: true })
+      addedItemIds.add(item.itemId)
+    }
+  } else if (profile.dominantType === 'tank' && situationalItems.length < 2) {
     const item = classBuild.situationalTank[0]
-    situationalItems.push({ name: item.name, itemId: item.itemId, reason: 'Anti-tank (compo tanky ennemie)', situational: true })
-  } else {
-    // Mixed : choisir AD ou AP selon ce qu'il y a le plus
+    if (!addedItemIds.has(item.itemId)) {
+      situationalItems.push({ name: item.name, itemId: item.itemId, reason: `Anti-tank (${profile.tankCount} tanks)`, situational: true })
+      addedItemIds.add(item.itemId)
+    }
+  }
+
+  // Priorité 3 : Item de survie si on meurt beaucoup (4+ morts avant 20 min, ou 6+ total)
+  const needsSurvival = (deaths >= 4 && gameTime < 1200) || deaths >= 6
+  if (needsSurvival && situationalItems.length < 2) {
+    const item = classBuild.survivalItem
+    if (!addedItemIds.has(item.itemId)) {
+      situationalItems.push({ name: item.name, itemId: item.itemId, reason: `Survie (${deaths} morts — tu te fais focus)`, situational: true })
+      addedItemIds.add(item.itemId)
+    }
+  }
+
+  // Fallback si aucun situationnel : adaptif selon la comp la plus représentée
+  if (situationalItems.length === 0) {
     const item = profile.apCount > profile.adCount
       ? classBuild.situationalAP[0]
       : classBuild.situationalAD[0]
@@ -108,7 +151,10 @@ export function generateBuildRecommendations(
   style: CoachingStyle
 ): BuildRecommendations {
   const profile = analyzeEnemyProfile(gameData.enemies)
-  const myBuild = buildChampionBuild(gameData.champion, profile, style)
+  const myBuild = buildChampionBuild(
+    gameData.champion, profile, style,
+    gameData.kda.deaths, gameData.gameTime,
+  )
 
   return {
     myBuild,

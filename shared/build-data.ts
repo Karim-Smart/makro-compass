@@ -9,10 +9,13 @@ import type { CoachingStyle } from './types'
 export interface ClassBuild {
   coreItems: BuildItem[]         // 3 items core
   boots: BuildItem
+  bootsAP: BuildItem             // boots adaptatives vs AP
+  bootsAD: BuildItem             // boots adaptatives vs AD
   situationalAP: BuildItem[]     // vs comp AP
   situationalAD: BuildItem[]     // vs comp AD
   situationalTank: BuildItem[]   // vs comp tanky
   situationalHeal: BuildItem[]   // vs comp heal
+  survivalItem: BuildItem        // item de survie si on meurt beaucoup
 }
 
 export interface BuildItem {
@@ -30,10 +33,13 @@ export const CLASS_BUILDS: Record<ChampionClass, ClassBuild> = {
       { name: 'Opportunity', itemId: 6701 },
     ],
     boots: { name: 'Ionian Boots of Lucidity', itemId: 3158 },
+    bootsAP: { name: 'Mercury\'s Treads', itemId: 3111 },
+    bootsAD: { name: 'Plated Steelcaps', itemId: 3047 },
     situationalAP: [{ name: 'Maw of Malmortius', itemId: 3156 }],
     situationalAD: [{ name: 'Death\'s Dance', itemId: 6333 }],
     situationalTank: [{ name: 'Serylda\'s Grudge', itemId: 6694 }],
     situationalHeal: [{ name: 'Chempunk Chainsword', itemId: 6609 }],
+    survivalItem: { name: 'Guardian Angel', itemId: 3026 },
   },
   mage: {
     coreItems: [
@@ -42,10 +48,13 @@ export const CLASS_BUILDS: Record<ChampionClass, ClassBuild> = {
       { name: 'Rabadon\'s Deathcap', itemId: 3089 },
     ],
     boots: { name: 'Sorcerer\'s Shoes', itemId: 3020 },
+    bootsAP: { name: 'Mercury\'s Treads', itemId: 3111 },
+    bootsAD: { name: 'Plated Steelcaps', itemId: 3047 },
     situationalAP: [{ name: 'Banshee\'s Veil', itemId: 3102 }],
     situationalAD: [{ name: 'Zhonya\'s Hourglass', itemId: 3157 }],
     situationalTank: [{ name: 'Void Staff', itemId: 3135 }],
     situationalHeal: [{ name: 'Morellonomicon', itemId: 3165 }],
+    survivalItem: { name: 'Zhonya\'s Hourglass', itemId: 3157 },
   },
   marksman: {
     coreItems: [
@@ -54,10 +63,13 @@ export const CLASS_BUILDS: Record<ChampionClass, ClassBuild> = {
       { name: 'Bloodthirster', itemId: 3072 },
     ],
     boots: { name: 'Berserker\'s Greaves', itemId: 3006 },
+    bootsAP: { name: 'Mercury\'s Treads', itemId: 3111 },
+    bootsAD: { name: 'Plated Steelcaps', itemId: 3047 },
     situationalAP: [{ name: 'Wit\'s End', itemId: 3091 }],
     situationalAD: [{ name: 'Guardian Angel', itemId: 3026 }],
     situationalTank: [{ name: 'Lord Dominik\'s Regards', itemId: 3036 }],
     situationalHeal: [{ name: 'Mortal Reminder', itemId: 3033 }],
+    survivalItem: { name: 'Guardian Angel', itemId: 3026 },
   },
   bruiser: {
     coreItems: [
@@ -66,10 +78,13 @@ export const CLASS_BUILDS: Record<ChampionClass, ClassBuild> = {
       { name: 'Death\'s Dance', itemId: 6333 },
     ],
     boots: { name: 'Plated Steelcaps', itemId: 3047 },
+    bootsAP: { name: 'Mercury\'s Treads', itemId: 3111 },
+    bootsAD: { name: 'Plated Steelcaps', itemId: 3047 },
     situationalAP: [{ name: 'Maw of Malmortius', itemId: 3156 }],
     situationalAD: [{ name: 'Randuin\'s Omen', itemId: 3143 }],
     situationalTank: [{ name: 'Black Cleaver', itemId: 3071 }],
     situationalHeal: [{ name: 'Chempunk Chainsword', itemId: 6609 }],
+    survivalItem: { name: 'Sterak\'s Gage', itemId: 3053 },
   },
   tank: {
     coreItems: [
@@ -78,10 +93,13 @@ export const CLASS_BUILDS: Record<ChampionClass, ClassBuild> = {
       { name: 'Spirit Visage', itemId: 3065 },
     ],
     boots: { name: 'Plated Steelcaps', itemId: 3047 },
+    bootsAP: { name: 'Mercury\'s Treads', itemId: 3111 },
+    bootsAD: { name: 'Plated Steelcaps', itemId: 3047 },
     situationalAP: [{ name: 'Force of Nature', itemId: 4401 }],
     situationalAD: [{ name: 'Frozen Heart', itemId: 3110 }],
     situationalTank: [{ name: 'Warmog\'s Armor', itemId: 3083 }],
     situationalHeal: [{ name: 'Thornmail', itemId: 3075 }],
+    survivalItem: { name: 'Warmog\'s Armor', itemId: 3083 },
   },
   enchanter: {
     coreItems: [
@@ -90,10 +108,13 @@ export const CLASS_BUILDS: Record<ChampionClass, ClassBuild> = {
       { name: 'Redemption', itemId: 3107 },
     ],
     boots: { name: 'Ionian Boots of Lucidity', itemId: 3158 },
+    bootsAP: { name: 'Mercury\'s Treads', itemId: 3111 },
+    bootsAD: { name: 'Plated Steelcaps', itemId: 3047 },
     situationalAP: [{ name: 'Banshee\'s Veil', itemId: 3102 }],
     situationalAD: [{ name: 'Zhonya\'s Hourglass', itemId: 3157 }],
     situationalTank: [{ name: 'Ardent Censer', itemId: 3504 }],
     situationalHeal: [{ name: 'Chemtech Putrifier', itemId: 3011 }],
+    survivalItem: { name: 'Zhonya\'s Hourglass', itemId: 3157 },
   },
   engage: {
     coreItems: [
@@ -102,10 +123,13 @@ export const CLASS_BUILDS: Record<ChampionClass, ClassBuild> = {
       { name: 'Zeke\'s Convergence', itemId: 3050 },
     ],
     boots: { name: 'Boots of Swiftness', itemId: 3009 },
+    bootsAP: { name: 'Mercury\'s Treads', itemId: 3111 },
+    bootsAD: { name: 'Plated Steelcaps', itemId: 3047 },
     situationalAP: [{ name: 'Force of Nature', itemId: 4401 }],
     situationalAD: [{ name: 'Frozen Heart', itemId: 3110 }],
     situationalTank: [{ name: 'Warmog\'s Armor', itemId: 3083 }],
     situationalHeal: [{ name: 'Thornmail', itemId: 3075 }],
+    survivalItem: { name: 'Warmog\'s Armor', itemId: 3083 },
   },
   skirmisher: {
     coreItems: [
@@ -114,12 +138,29 @@ export const CLASS_BUILDS: Record<ChampionClass, ClassBuild> = {
       { name: 'Death\'s Dance', itemId: 6333 },
     ],
     boots: { name: 'Plated Steelcaps', itemId: 3047 },
+    bootsAP: { name: 'Mercury\'s Treads', itemId: 3111 },
+    bootsAD: { name: 'Plated Steelcaps', itemId: 3047 },
     situationalAP: [{ name: 'Wit\'s End', itemId: 3091 }],
     situationalAD: [{ name: 'Randuin\'s Omen', itemId: 3143 }],
     situationalTank: [{ name: 'Black Cleaver', itemId: 3071 }],
     situationalHeal: [{ name: 'Chempunk Chainsword', itemId: 6609 }],
+    survivalItem: { name: 'Death\'s Dance', itemId: 6333 },
   },
 }
+
+// ─── Champions avec du healing significatif (pas seulement les enchanters) ──
+
+export const HEALING_CHAMPIONS: Set<string> = new Set([
+  // Enchanters
+  'Soraka', 'Yuumi', 'Nami', 'Sona', 'Lulu', 'Janna', 'Milio',
+  // Self-heal / drain tanks
+  'Aatrox', 'Dr. Mundo', 'Warwick', 'Swain', 'Vladimir', 'Illaoi',
+  'Fiddlesticks', 'Sylas', 'Briar',
+  // ADC/fighters avec lifesteal intégré
+  'Samira', 'Aphelios', 'Draven',
+  // Supports avec heal
+  'Seraphine', 'Renata Glasc',
+])
 
 // ─── Conseils par style ─────────────────────────────────────────────────────
 
