@@ -308,7 +308,7 @@ export default function OverlayApp() {
       }}
     >
       {panel === 'stats' && inGame && (
-        <div className="relative h-full overlay-glass">
+        <div className="relative h-full overlay-glass animate-panel-left">
           <StatsOverlay gameData={gameData!} colors={colors} />
           {tiltStatus && tiltStatus.tiltLevel !== 'none' && (
             <div className="absolute top-1 right-1 z-10">
@@ -319,14 +319,14 @@ export default function OverlayApp() {
       )}
 
       {panel === 'timers' && inGame && (
-        <div className="space-y-1 overlay-glass h-full">
+        <div className="space-y-1 overlay-glass h-full animate-panel-left animate-panel-delay-1">
           {timers && <TimerOverlay timers={timers} colors={colors} gameData={gameData ?? undefined} />}
           <ItemsOverlay gameData={gameData!} colors={colors} />
         </div>
       )}
 
       {panel === 'advice' && (
-        <div className="flex flex-col gap-1 h-full">
+        <div className="flex flex-col gap-1 h-full animate-panel-right animate-panel-delay-1">
           {/* ── Mode Replay : afficher les événements de review ── */}
           {isReplayMode && reviewEvent && (
             <ReviewEventOverlay
@@ -384,19 +384,19 @@ export default function OverlayApp() {
       )}
 
       {panel === 'build' && buildData && (
-        <div className="overlay-glass h-full">
+        <div className="overlay-glass h-full animate-panel-right animate-panel-delay-2">
           <BuildStrip build={buildData.myBuild} colors={colors} />
         </div>
       )}
 
       {panel === 'style' && (
-        <div className="overlay-glass h-full">
+        <div className="overlay-glass h-full animate-panel-right animate-panel-delay-3">
           <StyleSwitcher selectedStyle={selectedStyle} />
         </div>
       )}
 
       {panel === 'wincondition' && winCondition && (
-        <div className="overlay-glass h-full">
+        <div className="overlay-glass h-full animate-panel-top">
           <WinConditionOverlay data={winCondition} colors={colors} />
         </div>
       )}
