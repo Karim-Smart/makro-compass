@@ -47,6 +47,74 @@ function computeCompProfile(picks: string[]): Record<CompTag, number> {
   return profile
 }
 
+interface CompWarning {
+  type: 'danger' | 'warning' | 'info'
+  text: string
+  color: string
+}
+
+function computeCompWarnings(picks: string[]): CompWarning[] {
+  const warnings: CompWarning[] = []
+  const filledPicks = picks.filter(Boolean)
+  if (filledPicks.length < 2) return warnings
+
+  let adCount = 0
+  let apCount = 0
+  let tankCount = 0
+  let engageCount = 0
+  let rangedDps = 0
+  let healCount = 0
+
+  const adClasses: ChampionClass[] = ['assassin', 'marksman', 'skirmisher']
+  const apClasses: ChampionClass[] = ['mage', 'enchanter']
+  const tankClasses: ChampionClass[] = ['tank', 'engage']
+
+  for (const name of filledPicks) {
+    const info = getChampion(name)
+    if (!info) continue
+    if (adClasses.includes(info.class)) adCount++
+    if (apClasses.includes(info.class)) apCount++
+    if (tankClasses.includes(info.class)) tankCount++
+    if (info.class === 'engage' || info.class === 'tank') engageCount++
+    if (info.class === 'marksman' || info.class === 'mage') rangedDps++
+    if (info.class === 'enchanter') healCount++
+  }
+
+  // Full AD — l'ennemi stack armure facilement
+  if (adCount >= 4 && apCount === 0) {
+    warnings.push({ type: 'danger', text: 'Full AD — l\'ennemi peut stack armure. Manque de dégâts magiques.', color: '#ef4444' })
+  } else if (adCount >= 3 && apCount === 0) {
+    warnings.push({ type: 'warning', text: 'Très AD-heavy — considère un AP pour diversifier les dégâts.', color: '#f59e0b' })
+  }
+
+  // Full AP
+  if (apCount >= 3 && adCount === 0) {
+    warnings.push({ type: 'warning', text: 'Très AP-heavy — l\'ennemi peut stack MR facilement.', color: '#f59e0b' })
+  }
+
+  // Pas d'engage
+  if (engageCount === 0 && filledPicks.length >= 3) {
+    warnings.push({ type: 'warning', text: 'Pas d\'engage — difficile d\'initier les teamfights.', color: '#f59e0b' })
+  }
+
+  // Pas de tank/frontline
+  if (tankCount === 0 && filledPicks.length >= 4) {
+    warnings.push({ type: 'danger', text: 'Pas de frontline — vulnérable aux assassins et au poke.', color: '#ef4444' })
+  }
+
+  // Pas de DPS ranged
+  if (rangedDps === 0 && filledPicks.length >= 3) {
+    warnings.push({ type: 'warning', text: 'Pas de DPS ranged — les tanks ennemis seront difficiles à tuer.', color: '#f59e0b' })
+  }
+
+  // Bonne diversité
+  if (warnings.length === 0 && filledPicks.length >= 4 && adCount >= 1 && apCount >= 1 && (tankCount >= 1 || engageCount >= 1)) {
+    warnings.push({ type: 'info', text: 'Comp équilibrée — bon mix de dégâts, engage et frontline.', color: '#22c55e' })
+  }
+
+  return warnings.slice(0, 3)
+}
+
 function getWinCondition(profile: Record<CompTag, number>): { label: string; color: string } | null {
   const entries = Object.entries(profile) as [CompTag, number][]
   const sorted = entries.sort((a, b) => b[1] - a[1])
@@ -273,6 +341,7 @@ export default function Draft() {
           allyWinCond={allyWinCond}
           enemyWinCond={enemyWinCond}
           draftScore={draftScore}
+          allyPicks={allyPicks}
         />
       )}
 
@@ -1338,13 +1407,16 @@ function TeamCompAnalysis({
   allyWinCond,
   enemyWinCond,
   draftScore,
+  allyPicks,
 }: {
   allyProfile: Record<CompTag, number>
   enemyProfile: Record<CompTag, number>
   allyWinCond: { label: string; color: string } | null
   enemyWinCond: { label: string; color: string } | null
   draftScore: number | null
+  allyPicks: string[]
 }) {
+  const compWarnings = useMemo(() => computeCompWarnings(allyPicks), [allyPicks])
   const tags = Object.keys(COMP_TAG_META) as CompTag[]
   const maxVal = Math.max(
     ...tags.map((t) => allyProfile[t]),
@@ -1438,6 +1510,29 @@ function TeamCompAnalysis({
               Leur force : {enemyWinCond.label}
             </span>
           ) : <span />}
+        </div>
+      )}
+
+      {/* Warnings de composition */}
+      {compWarnings.length > 0 && (
+        <div className="px-3 pb-2 flex flex-col gap-1" style={{ borderTop: '1px solid #C89B3C10' }}>
+          {compWarnings.map((w, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-1.5 px-2 py-1 clip-bevel-sm"
+              style={{
+                backgroundColor: w.type === 'danger' ? '#ef444415' : w.type === 'warning' ? '#f59e0b12' : '#22c55e12',
+                border: `1px solid ${w.color}30`,
+              }}
+            >
+              <span className="text-[9px]">
+                {w.type === 'danger' ? '⚠️' : w.type === 'warning' ? '⚡' : '✅'}
+              </span>
+              <span className="text-[9px] font-medium" style={{ color: w.color }}>
+                {w.text}
+              </span>
+            </div>
+          ))}
         </div>
       )}
 
