@@ -303,7 +303,7 @@ export default function OverlayApp() {
     <div
       className="w-full h-full"
       style={{
-        background: '#010A13',
+        background: 'transparent',
         userSelect: 'none',
       }}
     >
@@ -401,24 +401,7 @@ export default function OverlayApp() {
         </div>
       )}
 
-      {/* Message d'attente si pas encore en jeu */}
-      {!inGame && panel !== 'advice' && panel !== 'style' && (
-        <div className="flex items-center justify-center h-full px-3 overlay-glass">
-          <span className="text-[10px] font-mono" style={{ color: `${colors.accent}50` }}>
-            En attente de partie...
-          </span>
-        </div>
-      )}
-      {panel === 'advice' && !currentAdvice && !alert && !matchupBriefing && !(inGame && gameData?.matchup && gameData.matchup.levelDiff !== 0) && (
-        <div className="flex flex-col items-center justify-center h-full px-3 gap-1 overlay-glass">
-          <span className="text-[10px] font-mono" style={{ color: `${colors.accent}50` }}>
-            {inGame ? 'Analyse en cours...' : 'En attente de partie...'}
-          </span>
-          <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: `${colors.accent}30` }}>
-            {selectedStyle}
-          </span>
-        </div>
-      )}
+      {/* Les panneaux vides restent transparents — pas de message d'attente visible en jeu */}
     </div>
   )
 }

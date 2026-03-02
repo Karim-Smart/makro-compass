@@ -109,6 +109,7 @@ function createPanelWindow(spec: OverlaySpec): BrowserWindow {
     skipTaskbar: true,
     resizable: false,
     movable: false,
+    focusable: false,
     hasShadow: false,
     webPreferences: {
       preload: PRELOAD_OVERLAY,
@@ -119,6 +120,8 @@ function createPanelWindow(spec: OverlaySpec): BrowserWindow {
   })
 
   win.setAlwaysOnTop(true, 'screen-saver')
+  // Laisser passer les clics au jeu par défaut
+  win.setIgnoreMouseEvents(true, { forward: true })
   win.hide()
 
   const panelUrl = `?panel=${spec.panel}`
@@ -240,8 +243,13 @@ export function setPanelSettings(panels: Partial<OverlayPanels>): void {
     for (const key of Object.keys(panelSettings) as (keyof OverlayPanels)[]) {
       const win = getPanelWindow(key)
       if (!win || win.isDestroyed()) continue
-      if (panelSettings[key]) win.show()
-      else win.hide()
+      if (panelSettings[key]) {
+        win.setAlwaysOnTop(true, 'screen-saver')
+        win.setIgnoreMouseEvents(true, { forward: true })
+        win.showInactive()
+      } else {
+        win.hide()
+      }
     }
   }
 }
@@ -267,7 +275,13 @@ export function showOverlay(): void {
       continue
     }
 
-    if (panelSettings[key]) win.show()
+    if (panelSettings[key]) {
+      // Forcer alwaysOnTop + ignore mouse events à chaque show
+      // (le jeu peut réclamer le focus entre les shows)
+      win.setAlwaysOnTop(true, 'screen-saver')
+      win.setIgnoreMouseEvents(true, { forward: true })
+      win.showInactive()  // showInactive = montre sans voler le focus au jeu
+    }
     // les panneaux désactivés restent cachés
   }
   console.log('[WindowManager] Overlays affichés (partie détectée)')
