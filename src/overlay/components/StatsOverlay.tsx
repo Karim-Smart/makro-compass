@@ -103,8 +103,13 @@ export function StatsOverlay({ gameData, colors }: Props) {
 
   return (
     <div
-      className="overflow-hidden animate-fade-in"
+      className="overflow-hidden animate-fade-in overlay-glass clip-bevel"
     >
+      {/* Accent line dorée */}
+      <div
+        className="h-[1px]"
+        style={{ background: 'linear-gradient(90deg, transparent, #C89B3C35, transparent)' }}
+      />
       <div className="flex">
         {cols.map(({ label, main, sub, mainColor, labelColor, className: extraClass }, i) => (
           <div

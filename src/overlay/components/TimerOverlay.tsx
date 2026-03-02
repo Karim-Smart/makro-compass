@@ -58,12 +58,17 @@ export function TimerOverlay({ timers, colors, gameData }: Props) {
 
   return (
     <div
-      className="overflow-hidden animate-fade-in min-w-[160px]"
+      className="overflow-hidden animate-fade-in min-w-[160px] overlay-glass clip-bevel"
     >
+      {/* Accent line dorée */}
+      <div
+        className="h-[1px]"
+        style={{ background: 'linear-gradient(90deg, transparent, #C89B3C40, transparent)' }}
+      />
       {/* Header */}
       <div
-        className="px-3 pt-2.5 pb-1.5 text-[9px] font-black uppercase tracking-[0.22em]"
-        style={{ color: colors.accent, borderBottom: `1px solid ${colors.border}40` }}
+        className="px-3 pt-2 pb-1.5 text-[9px] font-black uppercase tracking-[0.22em]"
+        style={{ color: '#C89B3C', borderBottom: `1px solid ${colors.border}30` }}
       >
         Objectifs
       </div>
@@ -75,7 +80,7 @@ export function TimerOverlay({ timers, colors, gameData }: Props) {
             {Array.from({ length: 4 }, (_, i) => (
               <div
                 key={i}
-                className="w-2 h-2 rounded-sm"
+                className="w-2 h-2 clip-bevel-sm"
                 style={{
                   backgroundColor: i < gameData.objectives.dragonStacks ? '#C89B3C' : `${colors.border}50`,
                   transition: 'background-color 0.3s ease',

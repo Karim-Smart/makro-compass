@@ -67,8 +67,13 @@ export default function Runes() {
 
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold text-white">Runes</h1>
-        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded"
+        <div>
+          <div className="text-[9px] font-black uppercase tracking-[0.25em] mb-0.5" style={{ color: '#C89B3C', opacity: 0.5 }}>
+            Configuration
+          </div>
+          <h1 className="text-lg font-bold" style={{ color: '#F0E6D2', fontFamily: 'Cinzel, serif' }}>Runes</h1>
+        </div>
+        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 clip-bevel-sm"
           style={{ backgroundColor: `${c.accent}20`, color: c.accent }}>
           {selectedStyle}
         </span>
@@ -78,7 +83,7 @@ export default function Runes() {
       <div className="flex gap-2">
         {ROLES.map(r => (
           <button key={r.key} onClick={() => { setRole(r.key); setChampion(''); setSearch('') }}
-            className="flex-1 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
+            className="flex-1 py-1.5 clip-bevel-sm text-xs font-bold uppercase tracking-wider transition-all"
             style={{
               backgroundColor: role === r.key ? `${c.accent}20` : '#ffffff08',
               border: `1px solid ${role === r.key ? c.accent : '#ffffff15'}`,
@@ -96,16 +101,16 @@ export default function Runes() {
           onChange={e => { setSearch(e.target.value); setShowDropdown(true); if (!e.target.value) setChampion('') }}
           onFocus={() => setShowDropdown(true)}
           onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-          className="w-full text-sm px-4 py-2.5 rounded-xl bg-white/5 border text-white placeholder-gray-600 outline-none transition-colors"
+          className="w-full text-sm px-4 py-2.5 clip-bevel bg-white/5 border text-white placeholder-gray-600 outline-none transition-colors"
           style={{ borderColor: champion ? `${c.accent}60` : '#ffffff15' }}
         />
         {showDropdown && suggestions.length > 0 && (
-          <div className="absolute z-50 top-full mt-1 w-full bg-gray-900 border border-white/10 rounded-xl shadow-xl max-h-64 overflow-auto">
+          <div className="absolute z-50 top-full mt-1 w-full clip-bevel-lg border border-white/10 shadow-xl max-h-64 overflow-auto">
             {suggestions.map(ch => {
               const info = CHAMPIONS[ch]
               return (
                 <button key={ch} onMouseDown={() => selectChampion(ch)}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-violet-500/20 transition-colors flex items-center gap-2">
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-amber-700/20 transition-colors flex items-center gap-2">
                   <img src={getChampionLoadingUrl(ch)} alt={ch}
                     className="w-6 h-6 rounded-full object-cover object-top flex-shrink-0"
                     onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
@@ -125,7 +130,7 @@ export default function Runes() {
           {/* Left: Champion info + variant tabs */}
           <div className="flex flex-col gap-3 w-48 flex-shrink-0">
             {/* Champion card */}
-            <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${c.border}` }}>
+            <div className="clip-bevel-lg overflow-hidden" style={{ border: `1px solid ${c.border}` }}>
               <img src={getChampionLoadingUrl(champion)} alt={champion}
                 className="w-full h-32 object-cover object-top"
                 onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
@@ -139,7 +144,7 @@ export default function Runes() {
             <div className="flex flex-col gap-1.5">
               {(['standard', 'offensive', 'defensive'] as Variant[]).map(v => (
                 <button key={v} onClick={() => setVariant(v)}
-                  className="text-left px-3 py-2 rounded-lg transition-all"
+                  className="text-left px-3 py-2 clip-bevel-sm transition-all"
                   style={{
                     backgroundColor: variant === v ? `${c.accent}15` : '#ffffff06',
                     border: `1px solid ${variant === v ? `${c.accent}50` : '#ffffff10'}`,
@@ -153,7 +158,7 @@ export default function Runes() {
 
             {/* Import button */}
             <button onClick={handleImport}
-              className="py-2.5 rounded-xl font-bold text-sm uppercase tracking-wider transition-all"
+              className="py-2.5 clip-bevel font-bold text-sm uppercase tracking-wider transition-all"
               style={{
                 background: `${c.accent}20`, color: c.accent,
                 border: `1px solid ${c.accent}50`,
@@ -163,7 +168,7 @@ export default function Runes() {
           </div>
 
           {/* Right: Rune tree */}
-          <div className="flex-1 rounded-xl p-4" style={{ backgroundColor: '#ffffff06', border: `1px solid ${c.border}` }}>
+          <div className="flex-1 clip-bevel-lg p-4" style={{ backgroundColor: '#ffffff06', border: `1px solid ${c.border}` }}>
 
             {/* Primary tree */}
             <div className="flex items-center gap-2 mb-3">

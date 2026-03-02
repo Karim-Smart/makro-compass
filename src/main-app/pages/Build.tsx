@@ -120,15 +120,20 @@ export default function Build() {
 
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold text-white">Build</h1>
+        <div>
+          <div className="text-[9px] font-black uppercase tracking-[0.25em] mb-0.5" style={{ color: '#C89B3C', opacity: 0.5 }}>
+            Équipement
+          </div>
+          <h1 className="text-lg font-bold" style={{ color: '#F0E6D2', fontFamily: 'Cinzel, serif' }}>Build</h1>
+        </div>
         <div className="flex items-center gap-2">
           {isInGame && (
-            <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded"
+            <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-1 clip-bevel-sm"
               style={{ backgroundColor: '#22c55e20', color: '#22c55e' }}>
               Live
             </span>
           )}
-          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded"
+          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 clip-bevel-sm"
             style={{ backgroundColor: `${c.accent}20`, color: c.accent }}>
             {selectedStyle}
           </span>
@@ -137,7 +142,7 @@ export default function Build() {
 
       {/* Live banner */}
       {isInGame && gameData && (
-        <div className="rounded-xl px-4 py-3 flex items-center gap-3"
+        <div className="clip-bevel px-4 py-3 flex items-center gap-3"
           style={{ backgroundColor: '#22c55e08', border: '1px solid #22c55e30' }}>
           <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: '#22c55e' }} />
           <span className="text-xs text-gray-300">
@@ -152,7 +157,7 @@ export default function Build() {
           <div className="flex gap-2">
             {ROLES.map(r => (
               <button key={r.key} onClick={() => { setRole(r.key); setChampion(''); setSearch('') }}
-                className="flex-1 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
+                className="flex-1 py-1.5 clip-bevel-sm text-xs font-bold uppercase tracking-wider transition-all"
                 style={{
                   backgroundColor: role === r.key ? `${c.accent}20` : '#ffffff08',
                   border: `1px solid ${role === r.key ? c.accent : '#ffffff15'}`,
@@ -170,13 +175,13 @@ export default function Build() {
               onChange={e => { setSearch(e.target.value); setShowDropdown(true); if (!e.target.value) setChampion('') }}
               onFocus={() => setShowDropdown(true)}
               onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-              className="w-full text-sm px-3 py-2 rounded-lg bg-white/5 border text-white placeholder-gray-600 outline-none"
+              className="w-full text-sm px-3 py-2 clip-bevel bg-white/5 border text-white placeholder-gray-600 outline-none"
               style={{ borderColor: champion ? `${c.accent}60` : '#ffffff15' }} />
             {showDropdown && suggestions.length > 0 && (
-              <div className="absolute z-50 top-full mt-1 w-full bg-gray-900 border border-white/10 rounded-lg shadow-xl max-h-48 overflow-auto">
+              <div className="absolute z-50 top-full mt-1 w-full clip-bevel-lg border border-white/10 shadow-xl max-h-48 overflow-auto" style={{ backgroundColor: '#0A1628' }}>
                 {suggestions.map(ch => (
                   <button key={ch} onMouseDown={() => selectChampion(ch)}
-                    className="w-full text-left px-3 py-1.5 text-xs hover:bg-violet-500/20 transition-colors flex items-center gap-2">
+                    className="w-full text-left px-3 py-1.5 text-xs hover:bg-amber-700/20 transition-colors flex items-center gap-2">
                     <img src={getChampionLoadingUrl(ch)} alt={ch}
                       className="w-5 h-5 rounded-full object-cover object-top"
                       onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
@@ -204,10 +209,10 @@ export default function Build() {
                     }}
                     onFocus={() => setActiveEnemyIdx(idx)}
                     onBlur={() => setTimeout(() => setActiveEnemyIdx(-1), 200)}
-                    className="w-full text-xs px-2 py-1.5 rounded-lg bg-white/5 border text-white placeholder-gray-600 outline-none text-center"
+                    className="w-full text-xs px-2 py-1.5 clip-bevel-sm bg-white/5 border text-white placeholder-gray-600 outline-none text-center"
                     style={{ borderColor: enemy ? '#ef444460' : '#ffffff15' }} />
                   {activeEnemyIdx === idx && enemySearch[idx].length > 0 && (
-                    <div className="absolute z-50 top-full mt-1 w-32 bg-gray-900 border border-white/10 rounded-lg shadow-xl max-h-32 overflow-auto">
+                    <div className="absolute z-50 top-full mt-1 w-32 clip-bevel border border-white/10 shadow-xl max-h-32 overflow-auto" style={{ backgroundColor: '#0A1628' }}>
                       {Object.keys(CHAMPIONS).filter(ch =>
                         ch.toLowerCase().includes(enemySearch[idx].toLowerCase())
                       ).slice(0, 5).map(ch => (
@@ -230,14 +235,14 @@ export default function Build() {
         <div className="grid grid-cols-3 gap-4">
 
           {/* Core items */}
-          <div className="col-span-2 rounded-xl p-4" style={{ backgroundColor: '#ffffff06', border: `1px solid ${c.border}` }}>
+          <div className="col-span-2 clip-bevel-lg p-4" style={{ backgroundColor: '#ffffff06', border: `1px solid ${c.border}` }}>
             <div className="text-[10px] font-black uppercase tracking-wider mb-3" style={{ color: `${c.text}40` }}>
               Build recommandé — {champClass}
             </div>
 
             <div className="flex flex-wrap gap-3">
               {allItems.map((item, i) => (
-                <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                <div key={i} className="flex items-center gap-2 px-3 py-2 clip-bevel-sm"
                   style={{
                     backgroundColor: item.situational ? '#ffffff05' : `${c.accent}08`,
                     border: `1px solid ${item.situational ? '#ffffff15' : `${c.accent}30`}`,
@@ -257,14 +262,14 @@ export default function Build() {
             </div>
 
             {/* Style tip */}
-            <div className="mt-4 px-3 py-2 rounded-lg text-xs italic"
+            <div className="mt-4 px-3 py-2 clip-bevel-sm text-xs italic"
               style={{ backgroundColor: `${c.accent}08`, border: `1px solid ${c.accent}20`, color: `${c.text}80` }}>
               {STYLE_BUILD_TIPS[selectedStyle]}
             </div>
           </div>
 
           {/* Enemy profile */}
-          <div className="rounded-xl p-4" style={{ backgroundColor: '#ffffff06', border: `1px solid ${c.border}` }}>
+          <div className="clip-bevel-lg p-4" style={{ backgroundColor: '#ffffff06', border: `1px solid ${c.border}` }}>
             <div className="text-[10px] font-black uppercase tracking-wider mb-3" style={{ color: `${c.text}40` }}>
               Profil ennemi
             </div>
