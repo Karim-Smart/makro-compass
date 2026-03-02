@@ -298,3 +298,118 @@ export function computeInsights(games: RankedGame[]): Insight[] {
 
   return insights.sort((a, b) => b.priority - a.priority).slice(0, 6)
 }
+
+// ─── Debrief local par partie (gratuit, sans API) ─────────────────────────────
+
+export interface LocalDebrief {
+  strengths: string[]
+  improvements: string[]
+  keyTakeaway: string
+  score: number
+}
+
+/**
+ * Analyse une partie individuelle et génère un debrief structuré localement.
+ * Pas d'appel API — tout est calculé depuis les données de la partie.
+ */
+export function computeLocalDebrief(game: RankedGame): LocalDebrief {
+  const strengths: string[] = []
+  const improvements: string[] = []
+
+  const kda = game.deaths === 0 ? (game.kills + game.assists) : (game.kills + game.assists) / game.deaths
+  const csMin = game.gameTime > 60 ? game.cs / (game.gameTime / 60) : 0
+  const kp = game.teamKills > 0 ? ((game.kills + game.assists) / game.teamKills) * 100 : 0
+  const visionMin = game.gameTime > 60 ? game.wardScore / (game.gameTime / 60) : 0
+  const gameMin = game.gameTime / 60
+  const deathsPerMin = gameMin > 0 ? game.deaths / gameMin : 0
+
+  // ── KDA analysis ──
+  if (kda >= 5) {
+    strengths.push(`KDA exceptionnel (${kda.toFixed(1)}) — tu as dominé cette partie`)
+  } else if (kda >= 3) {
+    strengths.push(`Bon KDA (${kda.toFixed(1)}) — tu as joué clean`)
+  } else if (kda < 1.5 && game.deaths >= 5) {
+    improvements.push(`KDA trop bas (${kda.toFixed(1)}) — ${game.deaths} morts, joue plus prudemment`)
+  } else if (kda < 2) {
+    improvements.push(`KDA insuffisant (${kda.toFixed(1)}) — essaie de réduire tes morts`)
+  }
+
+  // ── CS analysis ──
+  if (csMin >= 8) {
+    strengths.push(`Farming excellent (${csMin.toFixed(1)} CS/min) — tu absorbes bien les ressources`)
+  } else if (csMin >= 6.5) {
+    strengths.push(`CS correct (${csMin.toFixed(1)}/min) — continue à ne pas rater les canons`)
+  } else if (csMin < 5 && csMin > 0) {
+    improvements.push(`CS trop bas (${csMin.toFixed(1)}/min) — chaque 15 CS = ~1 kill en or`)
+  }
+
+  // ── Kill participation ──
+  if (kp >= 70) {
+    strengths.push(`${kp.toFixed(0)}% KP — tu étais impliqué dans presque tous les kills`)
+  } else if (kp < 35 && game.teamKills >= 5) {
+    improvements.push(`Seulement ${kp.toFixed(0)}% KP — roam plus ou groupe pour les teamfights`)
+  }
+
+  // ── Vision ──
+  if (visionMin >= 1.5) {
+    strengths.push(`Excellent contrôle de vision (${game.wardScore} score) — tu aides ton équipe à jouer safe`)
+  } else if (visionMin < 0.4 && gameMin > 15) {
+    improvements.push(`Vision très basse (${visionMin.toFixed(1)}/min) — achète des wards de contrôle`)
+  }
+
+  // ── Deaths timing ──
+  if (game.deaths === 0) {
+    strengths.push('Zero mort — partie parfaite en survie')
+  } else if (deathsPerMin > 0.35) {
+    improvements.push(`${deathsPerMin.toFixed(2)} morts/min — tu meurs trop souvent, joue plus safe`)
+  }
+
+  // ── Game length ──
+  if (game.result === 'win' && gameMin < 25) {
+    strengths.push(`Victoire rapide en ${Math.floor(gameMin)} min — tu as bien converti ton avantage`)
+  } else if (game.result === 'loss' && gameMin > 35) {
+    improvements.push(`Partie perdue en ${Math.floor(gameMin)} min — essaie de closer plus tôt quand tu es ahead`)
+  }
+
+  // ── Kills vs assists ratio ──
+  if (game.kills >= 10 && game.assists >= 10) {
+    strengths.push(`${game.kills} kills + ${game.assists} assists — tu as tout fait dans cette partie`)
+  }
+
+  // ── Key takeaway ──
+  let keyTakeaway = ''
+  if (game.result === 'win') {
+    if (kda >= 4 && csMin >= 7) {
+      keyTakeaway = 'Partie modèle — continue de jouer comme ça et tu grimperas'
+    } else if (kda < 2) {
+      keyTakeaway = 'Victoire mais trop de morts — tu ne pourras pas toujours compter sur tes coéquipiers'
+    } else if (csMin < 5) {
+      keyTakeaway = 'Tu gagnes mais tu farm pas assez — avec un meilleur CS tu aurais snowball plus vite'
+    } else {
+      keyTakeaway = 'Bonne victoire — focus CS et vision pour passer au niveau supérieur'
+    }
+  } else {
+    if (kda >= 3 && kp >= 60) {
+      keyTakeaway = 'Tu as bien joué mais l\'équipe n\'a pas suivi — continue de carry comme ça'
+    } else if (game.deaths >= 8) {
+      keyTakeaway = `${game.deaths} morts = trop de gold gratuit pour l'ennemi. Joue plus safe, farm, et attends les ouvertures`
+    } else if (csMin < 5) {
+      keyTakeaway = 'La défaite vient probablement d\'un retard de farm — priorité : 7+ CS/min'
+    } else {
+      keyTakeaway = 'Défaite — analyse : as-tu farm, wardé, et participé aux objectifs ?'
+    }
+  }
+
+  const grade = computeGameGrade(game)
+
+  // Assurer au moins 1 item dans chaque liste
+  if (strengths.length === 0) strengths.push('Partie jouée — garde la motivation')
+  if (improvements.length === 0) improvements.push('Rien de critique — maintiens ce niveau')
+
+  return {
+    strengths: strengths.slice(0, 4),
+    improvements: improvements.slice(0, 4),
+    keyTakeaway,
+    score: grade.score,
+  }
+}

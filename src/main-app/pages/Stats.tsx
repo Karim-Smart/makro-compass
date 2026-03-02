@@ -3,7 +3,8 @@ import { useCoachingStore } from '../stores/coachingStore'
 import { COACHING_STYLES } from '../../../shared/constants'
 import { IPC } from '../../../shared/ipc-channels'
 import { getChampionIconUrl } from '../../../shared/champion-images'
-import { computeGameGrade, computeRecentForm } from '../../../shared/game-analysis'
+import { computeGameGrade, computeRecentForm, computeLocalDebrief } from '../../../shared/game-analysis'
+import type { LocalDebrief } from '../../../shared/game-analysis'
 import type { RankedGame, RankedQueueType, ReviewTimeline, ReviewEvent, PostGameDebriefResponse, SmartRecap } from '../../../shared/types'
 import FeatureLock from '../components/FeatureLock'
 
@@ -56,6 +57,8 @@ export default function Stats() {
   // AI Smart Recap : headline + grade IA par gameId
   const [recaps, setRecaps] = useState<Record<number, SmartRecap | 'loading'>>({})
   const [openRecapId, setOpenRecapId] = useState<number | null>(null)
+  // Local debrief (gratuit, calculé localement)
+  const [openLocalDebriefId, setOpenLocalDebriefId] = useState<number | null>(null)
 
   // Rechargement quand l'onglet change ou quand l'import LCU termine
   useEffect(() => {
@@ -466,6 +469,19 @@ export default function Stats() {
 
                     {/* Boutons Recap + Debrief IA + Analyser */}
                     <div className="ml-auto flex items-center gap-1.5">
+                      <button
+                        onClick={() => setOpenLocalDebriefId(openLocalDebriefId === game.id ? null : game.id)}
+                        className="text-[9px] font-bold px-2.5 py-1 clip-bevel-sm transition-all duration-150"
+                        style={openLocalDebriefId === game.id ? {
+                          backgroundColor: '#22c55e',
+                          color: '#000',
+                        } : {
+                          backgroundColor: '#22c55e20',
+                          color: '#22c55e',
+                        }}
+                      >
+                        {openLocalDebriefId === game.id ? '▲ Bilan' : 'Bilan'}
+                      </button>
                       <FeatureLock feature="smart_recap">
                         <button
                           onClick={() => handleRecap(game.id)}
@@ -513,6 +529,53 @@ export default function Stats() {
                     </div>
                   </div>
                 </div>
+
+                {/* ── Panneau Local Debrief (gratuit) ── */}
+                {openLocalDebriefId === game.id && (() => {
+                  const debrief = computeLocalDebrief(game)
+                  return (
+                    <div
+                      className="clip-bevel px-4 py-3"
+                      style={{ backgroundColor: `${c.border}25`, borderTop: `1px solid #22c55e30` }}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: '#22c55e' }}>
+                          Bilan de partie
+                        </span>
+                        <span className="text-[8px] px-1.5 py-0.5 clip-bevel-sm font-mono font-black"
+                          style={{ backgroundColor: `${grade.color}20`, color: grade.color }}>
+                          {debrief.score}pts
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 mb-2">
+                        <div>
+                          <span className="text-[9px] font-bold block mb-1" style={{ color: '#22c55e' }}>Points forts</span>
+                          {debrief.strengths.map((s, i) => (
+                            <div key={i} className="flex items-start gap-1 mb-0.5">
+                              <span className="mt-1 w-1 h-1 rounded-full flex-shrink-0" style={{ backgroundColor: '#22c55e' }} />
+                              <span className="text-[10px] leading-relaxed" style={{ color: c.text, opacity: 0.7 }}>{s}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div>
+                          <span className="text-[9px] font-bold block mb-1" style={{ color: '#f59e0b' }}>À améliorer</span>
+                          {debrief.improvements.map((s, i) => (
+                            <div key={i} className="flex items-start gap-1 mb-0.5">
+                              <span className="mt-1 w-1 h-1 rounded-full flex-shrink-0" style={{ backgroundColor: '#f59e0b' }} />
+                              <span className="text-[10px] leading-relaxed" style={{ color: c.text, opacity: 0.7 }}>{s}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="px-3 py-2 clip-bevel" style={{ backgroundColor: `#22c55e10`, border: `1px solid #22c55e30` }}>
+                        <span className="text-[9px] font-black uppercase tracking-widest block mb-1" style={{ color: '#22c55e', opacity: 0.6 }}>
+                          Conseil
+                        </span>
+                        <span className="text-xs" style={{ color: c.text }}>{debrief.keyTakeaway}</span>
+                      </div>
+                    </div>
+                  )
+                })()}
 
                 {/* ── Panneau Smart Recap inline ── */}
                 {openRecapId === game.id && recaps[game.id] && recaps[game.id] !== 'loading' && (() => {
