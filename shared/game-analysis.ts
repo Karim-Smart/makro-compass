@@ -343,6 +343,50 @@ export function computeInsights(games: RankedGame[]): Insight[] {
   return insights.sort((a, b) => b.priority - a.priority).slice(0, 6)
 }
 
+// ─── Stats quotidiennes (7 derniers jours) ───────────────────────────────────
+
+export interface DayStat {
+  date: string       // 'lun', 'mar', etc.
+  dateShort: string  // 'DD/MM'
+  games: number
+  wins: number
+  winrate: number    // 0-100
+  avgKda: number
+}
+
+/**
+ * Calcule les stats par jour pour les 7 derniers jours (du plus ancien au plus récent).
+ * Retourne toujours 7 entrées, même si 0 parties un jour donné.
+ */
+export function computeDailyStats(games: RankedGame[]): DayStat[] {
+  const DAYS_FR = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam']
+  const result: DayStat[] = []
+
+  for (let d = 6; d >= 0; d--) {
+    const dayStart = new Date()
+    dayStart.setHours(0, 0, 0, 0)
+    dayStart.setDate(dayStart.getDate() - d)
+    const dayEnd = new Date(dayStart)
+    dayEnd.setDate(dayEnd.getDate() + 1)
+
+    const dayGames = games.filter(g => g.timestamp >= dayStart.getTime() && g.timestamp < dayEnd.getTime())
+    const wins = dayGames.filter(g => g.result === 'win').length
+    const kdas = dayGames.map(g => g.deaths === 0 ? 5 : (g.kills + g.assists) / g.deaths)
+    const avgKda = kdas.length > 0 ? kdas.reduce((a, b) => a + b, 0) / kdas.length : 0
+
+    result.push({
+      date: DAYS_FR[dayStart.getDay()],
+      dateShort: `${dayStart.getDate().toString().padStart(2, '0')}/${(dayStart.getMonth() + 1).toString().padStart(2, '0')}`,
+      games: dayGames.length,
+      wins,
+      winrate: dayGames.length > 0 ? Math.round((wins / dayGames.length) * 100) : -1,
+      avgKda: Math.round(avgKda * 100) / 100,
+    })
+  }
+
+  return result
+}
+
 // ─── Debrief local par partie (gratuit, sans API) ─────────────────────────────
 
 export interface LocalDebrief {

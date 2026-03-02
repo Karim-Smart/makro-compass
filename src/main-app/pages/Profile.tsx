@@ -3,7 +3,7 @@ import { useCoachingStore } from '../stores/coachingStore'
 import { COACHING_STYLES } from '../../../shared/constants'
 import { IPC } from '../../../shared/ipc-channels'
 import { getChampionIconUrl } from '../../../shared/champion-images'
-import { computeInsights, computeRoleStats } from '../../../shared/game-analysis'
+import { computeInsights, computeRoleStats, computeDailyStats } from '../../../shared/game-analysis'
 import type { RankedGame } from '../../../shared/types'
 
 // ─── Calcul des métriques GPI ─────────────────────────────────────────────────
@@ -240,6 +240,7 @@ export default function Profile() {
   const championPool = computeChampionPool(games)
   const insights = computeInsights(games)
   const roleStats = computeRoleStats(games)
+  const dailyStats = computeDailyStats(games)
   const recent20 = games.slice(0, 20)
   const recent10 = games.slice(0, 10)
 
@@ -467,6 +468,84 @@ export default function Profile() {
               )}
             </div>
           </div>
+
+          {/* Progression 7 jours */}
+          {!loading && dailyStats.some(d => d.games > 0) && (
+            <div
+              className="clip-bevel-lg p-4"
+              style={{
+                background: `linear-gradient(160deg, ${c.bg} 0%, ${c.border}40 100%)`,
+                border: `1px solid ${c.border}`,
+              }}
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-0.5 h-3.5 rounded-full" style={{ backgroundColor: '#C89B3C' }} />
+                <span className="text-[9px] font-black uppercase tracking-[0.2em]" style={{ color: c.text, opacity: 0.4 }}>
+                  Progression 7 jours
+                </span>
+              </div>
+
+              {/* Sparkline winrate + barres de volume */}
+              <div className="flex items-end gap-1.5" style={{ height: 80 }}>
+                {dailyStats.map((day, i) => {
+                  const maxGames = Math.max(...dailyStats.map(d => d.games), 1)
+                  const barH = day.games > 0 ? Math.max(12, (day.games / maxGames) * 60) : 4
+                  const wrColor = day.winrate === -1 ? `${c.text}20`
+                    : day.winrate >= 55 ? '#22c55e' : day.winrate >= 45 ? c.accent : '#ef4444'
+                  const isToday = i === dailyStats.length - 1
+
+                  return (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-1 justify-end" style={{ height: '100%' }}>
+                      {/* Winrate label */}
+                      {day.games > 0 && (
+                        <span className="text-[8px] font-mono font-black" style={{ color: wrColor }}>
+                          {day.winrate}%
+                        </span>
+                      )}
+                      {/* Barre */}
+                      <div
+                        className="w-full clip-bevel-sm transition-all duration-500"
+                        style={{
+                          height: barH,
+                          backgroundColor: day.games > 0 ? `${wrColor}40` : `${c.text}10`,
+                          border: isToday ? `1px solid ${wrColor}80` : `1px solid ${wrColor}20`,
+                        }}
+                      />
+                      {/* Label jour */}
+                      <span
+                        className="text-[7px] font-mono font-bold uppercase"
+                        style={{ color: isToday ? c.accent : c.text, opacity: isToday ? 0.8 : 0.3 }}
+                      >
+                        {day.date}
+                      </span>
+                      {/* Nombre de parties */}
+                      <span className="text-[7px] font-mono" style={{ color: c.text, opacity: 0.2 }}>
+                        {day.games > 0 ? `${day.games}G` : '—'}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Résumé semaine */}
+              {(() => {
+                const weekGames = dailyStats.reduce((a, d) => a + d.games, 0)
+                const weekWins = dailyStats.reduce((a, d) => a + d.wins, 0)
+                const weekWr = weekGames > 0 ? Math.round((weekWins / weekGames) * 100) : 0
+                const activeDays = dailyStats.filter(d => d.games > 0).length
+                return weekGames > 0 ? (
+                  <div className="flex items-center justify-between mt-3 pt-2" style={{ borderTop: `1px solid ${c.border}30` }}>
+                    <span className="text-[8px] font-mono" style={{ color: c.text, opacity: 0.3 }}>
+                      {weekGames} parties · {activeDays}/7 jours actifs
+                    </span>
+                    <span className="text-[9px] font-mono font-black" style={{ color: weekWr >= 50 ? '#22c55e' : '#ef4444' }}>
+                      {weekWins}W {weekGames - weekWins}L ({weekWr}%)
+                    </span>
+                  </div>
+                ) : null
+              })()}
+            </div>
+          )}
 
           {/* Stats par rôle */}
           {!loading && roleStats.length > 0 && (
