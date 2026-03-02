@@ -126,33 +126,59 @@ export function TimerOverlay({ timers, colors, gameData }: Props) {
             ? `${dragonType}`
             : label
 
-          return (
-            <div key={key} className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm leading-none">{dragonEmoji ?? icon}</span>
-                <span className="text-[11px] font-medium" style={{ color: colors.text, opacity: 0.75 }}>
-                  {displayLabel}
-                </span>
-              </div>
+          // Calcul du pourcentage de progression pour la mini-barre
+          const respawnDuration = key === 'dragon' ? 300 : key === 'baron' ? 360 : 360
+          const remaining = timer.nextSpawn ? Math.max(0, timer.nextSpawn - now) / 1000 : 0
+          const progressPct = isDead && remaining > 0
+            ? Math.max(0, Math.min(100, ((respawnDuration - remaining) / respawnDuration) * 100))
+            : 0
 
-              {isDead ? (
-                <span
-                  className={`text-xs font-mono font-black timer-urgency ${urgencyColor === '#ef4444' ? 'timer-urgent' : urgencyColor === '#f59e0b' ? 'timer-warning' : ''}`}
-                  style={{
-                    color: urgencyColor,
-                    animation: urgencyColor === '#ef4444' ? 'pulseOpacity 0.8s ease-in-out infinite' : 'none',
-                  }}
-                >
-                  ⟳ {text}
-                </span>
-              ) : (
-                <span
-                  className="text-[10px] font-semibold flex items-center gap-1"
-                  style={{ color: '#22c55e' }}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block animate-pulse" />
-                  Vivant
-                </span>
+          return (
+            <div key={key} className="flex flex-col gap-0.5">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm leading-none">{dragonEmoji ?? icon}</span>
+                  <span className="text-[11px] font-medium" style={{ color: colors.text, opacity: 0.75 }}>
+                    {displayLabel}
+                  </span>
+                </div>
+
+                {isDead ? (
+                  <span
+                    className={`text-xs font-mono font-black timer-urgency ${urgencyColor === '#ef4444' ? 'timer-urgent timer-border-pulse' : urgencyColor === '#f59e0b' ? 'timer-warning' : ''}`}
+                    style={{
+                      color: urgencyColor,
+                      animation: urgencyColor === '#ef4444'
+                        ? 'pulseOpacity 0.8s ease-in-out infinite'
+                        : urgencyColor === '#f59e0b'
+                          ? 'pulseOpacity 1.5s ease-in-out infinite'
+                          : 'none',
+                    }}
+                  >
+                    ⟳ {text}
+                  </span>
+                ) : (
+                  <span
+                    className="text-[10px] font-semibold flex items-center gap-1"
+                    style={{ color: '#22c55e' }}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block animate-pulse" />
+                    Vivant
+                  </span>
+                )}
+              </div>
+              {/* Mini progress bar pour les timers de respawn */}
+              {isDead && (
+                <div className="h-[2px] w-full rounded-full overflow-hidden" style={{ backgroundColor: `${colors.border}30` }}>
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${progressPct}%`,
+                      backgroundColor: urgencyColor,
+                      transition: 'width 0.5s linear, background-color 0.5s ease',
+                    }}
+                  />
+                </div>
               )}
             </div>
           )

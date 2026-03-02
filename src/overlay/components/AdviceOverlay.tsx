@@ -62,15 +62,21 @@ export function AdviceOverlay({ advice, colors, queuePos, queueTotal, rotateKey,
 
   return (
     <div
-      className="w-[360px] overflow-hidden animate-slide-up clip-bevel overlay-glass"
+      className={`w-[360px] overflow-hidden animate-slide-up clip-bevel overlay-glass ${advice.priority === 'high' ? 'priority-pulse-high' : ''}`}
       style={{
-        boxShadow: `0 8px 32px rgba(0,0,0,0.6), 0 0 12px rgba(200, 155, 60, 0.06)`,
+        boxShadow: advice.priority === 'high'
+          ? `0 8px 32px rgba(0,0,0,0.6), 0 0 16px rgba(239, 68, 68, 0.15)`
+          : `0 8px 32px rgba(0,0,0,0.6), 0 0 12px rgba(200, 155, 60, 0.06)`,
       }}
     >
-      {/* Ligne d'accent dorée en haut */}
+      {/* Ligne d'accent colorée en haut (rouge si urgent, dorée sinon) */}
       <div
         className="h-0.5 w-full"
-        style={{ background: `linear-gradient(90deg, #C89B3C, ${colors.accent}60, transparent)` }}
+        style={{
+          background: advice.priority === 'high'
+            ? `linear-gradient(90deg, #ef4444, ${meta.color}60, transparent)`
+            : `linear-gradient(90deg, #C89B3C, ${colors.accent}60, transparent)`,
+        }}
       />
 
       <div className="px-4 py-3">

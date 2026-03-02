@@ -139,3 +139,103 @@
 .level-flash {
   animation: levelFlash 0.6s ease-out;
 }
+
+/* ─── Priority pulse pour les conseils urgents ─────────────────── */
+@keyframes priorityPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  50%  { box-shadow: 0 0 12px 2px rgba(239, 68, 68, 0.25); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.priority-pulse-high {
+  animation: priorityPulse 2s ease-in-out infinite;
+}
+
+/* ─── Gold shimmer border pour les moments critiques ──────────── */
+@keyframes goldShimmer {
+  0%   { border-color: rgba(200, 155, 60, 0.2); }
+  50%  { border-color: rgba(200, 155, 60, 0.5); }
+  100% { border-color: rgba(200, 155, 60, 0.2); }
+}
+
+.shimmer-gold {
+  animation: goldShimmer 2.5s ease-in-out infinite;
+}
+
+/* ─── Kill flash pour les changements de score ───────────────── */
+@keyframes killFlash {
+  0%   { transform: scale(1); }
+  25%  { transform: scale(1.3); color: #22c55e; }
+  100% { transform: scale(1); }
+}
+
+@keyframes deathFlash {
+  0%   { transform: scale(1); }
+  25%  { transform: scale(1.3); color: #ef4444; }
+  100% { transform: scale(1); }
+}
+
+.kill-flash {
+  animation: killFlash 0.4s ease-out;
+}
+
+.death-flash {
+  animation: deathFlash 0.4s ease-out;
+}
+
+/* ─── Timer progress ring ─────────────────────────────────────── */
+@keyframes timerBorderPulse {
+  0%, 100% { opacity: 0.6; }
+  50%      { opacity: 1; }
+}
+
+.timer-border-pulse {
+  animation: timerBorderPulse 1s ease-in-out infinite;
+}
+
+/* ─── Slide out pour les conseils qui partent ─────────────────── */
+@keyframes slideOut {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-12px); }
+}
+
+.animate-slide-out {
+  animation: slideOut 0.3s ease-in forwards;
+}
+
+/* ─── Staggered fade pour les enfants successifs ─────────────── */
+.stagger-enter > * {
+  opacity: 0;
+  animation: fade-in 0.3s ease-out forwards;
+}
+.stagger-enter > *:nth-child(1) { animation-delay: 0s; }
+.stagger-enter > *:nth-child(2) { animation-delay: 0.06s; }
+.stagger-enter > *:nth-child(3) { animation-delay: 0.12s; }
+.stagger-enter > *:nth-child(4) { animation-delay: 0.18s; }
+.stagger-enter > *:nth-child(5) { animation-delay: 0.24s; }
+
+/* ─── Nombre animé (transition de valeur) ────────────────────── */
+.animate-number {
+  transition: transform 0.2s ease-out;
+  display: inline-block;
+}
+
+.animate-number-up {
+  animation: numberBounceUp 0.3s ease-out;
+}
+
+.animate-number-down {
+  animation: numberBounceDown 0.3s ease-out;
+}
+
+@keyframes numberBounceUp {
+  0%   { transform: translateY(0); }
+  40%  { transform: translateY(-3px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes numberBounceDown {
+  0%   { transform: translateY(0); }
+  40%  { transform: translateY(3px); }
+  100% { transform: translateY(0); }
+}

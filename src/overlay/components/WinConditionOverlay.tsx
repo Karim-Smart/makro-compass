@@ -33,7 +33,7 @@ export function WinConditionOverlay({ data, colors: c }: Props) {
   const pct = Math.min(100, Math.max(0, data.winProbability))
 
   return (
-    <div className="px-3 py-2 h-full flex flex-col justify-center gap-1.5 overlay-glass clip-bevel animate-fade-in">
+    <div className={`px-3 py-2 h-full flex flex-col justify-center gap-1.5 overlay-glass clip-bevel animate-fade-in ${pct >= 65 ? 'shimmer-gold' : ''}`}>
       {/* Accent line dorée en haut */}
       <div
         className="absolute top-0 left-[8px] right-[8px] h-[1px]"

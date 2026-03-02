@@ -11,7 +11,13 @@ export function StatsOverlay({ gameData, colors }: Props) {
   const [displayTime, setDisplayTime] = useState(gameData.gameTime)
   const baseRef = useRef({ gameTime: gameData.gameTime, receivedAt: Date.now() })
   const [levelFlash, setLevelFlash] = useState(false)
+  const [killFlash, setKillFlash] = useState(false)
+  const [deathFlash, setDeathFlash] = useState(false)
+  const [csFlash, setCsFlash] = useState(false)
   const prevLevelRef = useRef(gameData.level)
+  const prevKillsRef = useRef(gameData.kda.kills)
+  const prevDeathsRef = useRef(gameData.kda.deaths)
+  const prevCsRef = useRef(gameData.cs)
 
   useEffect(() => {
     baseRef.current = { gameTime: gameData.gameTime, receivedAt: Date.now() }
@@ -36,6 +42,39 @@ export function StatsOverlay({ gameData, colors }: Props) {
     }
     prevLevelRef.current = gameData.level
   }, [gameData.level])
+
+  // Détection kill → flash vert
+  useEffect(() => {
+    if (gameData.kda.kills > prevKillsRef.current) {
+      setKillFlash(true)
+      const t = setTimeout(() => setKillFlash(false), 400)
+      prevKillsRef.current = gameData.kda.kills
+      return () => clearTimeout(t)
+    }
+    prevKillsRef.current = gameData.kda.kills
+  }, [gameData.kda.kills])
+
+  // Détection death → flash rouge
+  useEffect(() => {
+    if (gameData.kda.deaths > prevDeathsRef.current) {
+      setDeathFlash(true)
+      const t = setTimeout(() => setDeathFlash(false), 400)
+      prevDeathsRef.current = gameData.kda.deaths
+      return () => clearTimeout(t)
+    }
+    prevDeathsRef.current = gameData.kda.deaths
+  }, [gameData.kda.deaths])
+
+  // Détection gain de CS significatif (toutes les 10 CS)
+  useEffect(() => {
+    if (gameData.cs >= prevCsRef.current + 10) {
+      setCsFlash(true)
+      const t = setTimeout(() => setCsFlash(false), 300)
+      prevCsRef.current = gameData.cs
+      return () => clearTimeout(t)
+    }
+    if (gameData.cs > prevCsRef.current) prevCsRef.current = gameData.cs
+  }, [gameData.cs])
 
   const csPerMin = displayTime > 0
     ? (gameData.cs / (displayTime / 60)).toFixed(1)
@@ -76,6 +115,7 @@ export function StatsOverlay({ gameData, colors }: Props) {
       main:  `${gameData.kda.kills}/${gameData.kda.deaths}/${gameData.kda.assists}`,
       sub:   `${kdaRatio} KDA`,
       mainColor: kdaColor,
+      className: killFlash ? 'kill-flash' : deathFlash ? 'death-flash' : '',
     },
     {
       label: phase,
@@ -83,6 +123,7 @@ export function StatsOverlay({ gameData, colors }: Props) {
       sub:   `${gameData.cs} CS · ${kp}% KP`,
       mainColor: colors.text,
       labelColor: phaseColor,
+      className: csFlash ? 'animate-number-up' : '',
     },
     {
       label: `Niv ${gameData.level}`,
