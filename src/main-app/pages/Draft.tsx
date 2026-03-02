@@ -447,7 +447,7 @@ function ChampionInput({
 
       {/* Suggestions dropdown */}
       {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute z-50 top-full mt-1 w-full bg-gray-900 border border-white/10 clip-bevel shadow-xl overflow-hidden">
+        <div className="absolute z-50 top-full mt-1 w-full clip-bevel border border-white/10 shadow-xl overflow-hidden">
           {suggestions.map((champ) => {
             const info = CHAMPIONS[champ]
             const suggImgUrl = getChampionLoadingUrl(champ)
@@ -603,7 +603,7 @@ function EnemyRoleSlot({
 
       {/* Suggestions dropdown */}
       {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute z-50 top-full mt-1 w-full bg-gray-900 border border-white/10 clip-bevel shadow-xl overflow-hidden">
+        <div className="absolute z-50 top-full mt-1 w-full clip-bevel border border-white/10 shadow-xl overflow-hidden">
           {suggestions.map((champ) => {
             const info = CHAMPIONS[champ]
             const suggImgUrl = getChampionLoadingUrl(champ)
@@ -738,7 +738,7 @@ function ChampionHoverTooltip({
         {/* Counter ennemis */}
         {countersEnemies.length > 0 && (
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[9px] font-bold text-violet-400">COUNTER</span>
+            <span className="text-[9px] font-bold" style={{ color: '#C89B3C' }}>COUNTER</span>
             {countersEnemies.map((e) => (
               <span key={e} className="text-[9px] px-1.5 py-px rounded" style={{ backgroundColor: '#22c55e15', color: '#86efac' }}>
                 &gt; {e}
