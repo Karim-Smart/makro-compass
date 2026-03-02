@@ -38,28 +38,65 @@ RÈGLES :
 - Langue : FRANÇAIS uniquement
 - Sois précis et actionnable`
 
-let lastMockWinProb = 50
+let lastLocalWinProb = 50
 
-function generateMockWinCondition(gameData: GameData): WinConditionData {
+/**
+ * Estimation locale de la probabilité de victoire — disponible pour TOUS les tiers.
+ * Utilise un modèle composite : gold diff, kills, drakes, tours, objectifs, CS/ward.
+ * Plus de facteurs = estimation plus nuancée qu'une simple heuristique.
+ */
+function generateLocalWinCondition(gameData: GameData): WinConditionData {
   const killDiff = gameData.teamKills - gameData.enemyKills
   const drakeDiff = gameData.objectives.dragonStacks - gameData.objectives.enemyDragonStacks
   const towerDiff = gameData.towers.enemyDestroyed - gameData.towers.allyDestroyed
+  const goldDiff  = gameData.teamGold - gameData.enemyGold
   const phase = gameData.gameTime < 840 ? 'early' : gameData.gameTime < 1500 ? 'mid' : 'late'
 
-  // Probabilité calculée à partir de multiples facteurs
+  // ── Score composite pondéré par phase ──
   let winProb = 50
-  winProb += killDiff * 2.5       // chaque kill diff = ~2.5%
-  winProb += drakeDiff * 4        // chaque drake diff = ~4%
-  winProb += towerDiff * 3        // chaque tour diff = ~3%
-  if (gameData.objectives.baronActive) winProb += 10
-  if (gameData.objectives.elderActive) winProb += 15
+
+  // Gold diff : facteur principal (poids croissant en mid/late)
+  const goldWeight = phase === 'early' ? 0.5 : phase === 'mid' ? 1.0 : 1.5
+  winProb += (goldDiff / 1000) * goldWeight  // +1% par 1k gold diff
+
+  // Kill diff : indicateur de momentum
+  winProb += killDiff * 2.0
+
+  // Drakes : avantage cumulatif fort, surtout soul point
+  winProb += drakeDiff * 3.5
+  if (gameData.objectives.dragonStacks >= 3) winProb += 5  // soul point bonus
+  if (gameData.objectives.enemyDragonStacks >= 3) winProb -= 5
+
+  // Tours : contrôle de map + gold + vision
+  winProb += towerDiff * 2.5
+
+  // Objectifs actifs : impact massif mais temporaire
+  if (gameData.objectives.baronActive) winProb += 12
+  if (gameData.objectives.elderActive) winProb += 18
+
+  // CS/min personnel : indicateur de farm quality (±2%)
+  const csMin = gameData.gameTime > 60 ? gameData.cs / (gameData.gameTime / 60) : 0
+  if (csMin >= 8) winProb += 2
+  else if (csMin < 5 && csMin > 0) winProb -= 2
+
+  // Ward score : bonus mineur pour bonne vision
+  const wardMin = gameData.gameTime > 60 ? gameData.wardScore / (gameData.gameTime / 60) : 0
+  if (wardMin >= 1.2) winProb += 1
+  else if (wardMin < 0.3 && gameData.gameTime > 600) winProb -= 1
+
+  // Level diff vs matchup : indicateur de lane state
+  if (gameData.matchup) {
+    winProb += gameData.matchup.levelDiff * 1.0
+  }
+
+  // Clamp entre 5% et 95%
   winProb = Math.max(5, Math.min(95, Math.round(winProb)))
 
   // Trend basé sur l'évolution depuis le dernier tick
-  const trend: WinConditionData['trend'] = winProb > lastMockWinProb + 3 ? 'up'
-    : winProb < lastMockWinProb - 3 ? 'down'
+  const trend: WinConditionData['trend'] = winProb > lastLocalWinProb + 3 ? 'up'
+    : winProb < lastLocalWinProb - 3 ? 'down'
     : 'stable'
-  lastMockWinProb = winProb
+  lastLocalWinProb = winProb
 
   // Condition principale contextuelle
   let primaryCondition: string
@@ -106,10 +143,10 @@ function generateMockWinCondition(gameData: GameData): WinConditionData {
 
 async function generateWinCondition(gameData: GameData): Promise<WinConditionData> {
   if (DEV_MOCK_AI) {
-    return generateMockWinCondition(gameData)
+    return generateLocalWinCondition(gameData)
   }
 
-  if (!anthropic) return generateMockWinCondition(gameData)
+  if (!anthropic) return generateLocalWinCondition(gameData)
 
   const phase = gameData.gameTime < 840 ? 'EARLY' : gameData.gameTime < 1500 ? 'MID' : 'LATE'
   const killDiff = gameData.teamKills - gameData.enemyKills
@@ -136,9 +173,9 @@ Retourne le JSON.`.trim()
     })
 
     const textContent = message.content.find((c) => c.type === 'text')
-    if (!textContent || textContent.type !== 'text') return generateMockWinCondition(gameData)
+    if (!textContent || textContent.type !== 'text') return generateLocalWinCondition(gameData)
 
-    const fallback = generateMockWinCondition(gameData)
+    const fallback = generateLocalWinCondition(gameData)
     const parsed = JSON.parse(textContent.text) as WinConditionData
     return {
       winProbability: typeof parsed.winProbability === 'number' ? Math.max(0, Math.min(100, parsed.winProbability)) : 50,
@@ -148,23 +185,30 @@ Retourne le JSON.`.trim()
     }
   } catch (error) {
     console.error('[WinConditionTracker] Erreur:', (error as Error).message)
-    return generateMockWinCondition(gameData)
+    return generateLocalWinCondition(gameData)
   }
 }
 
 async function tick(): Promise<void> {
   if (!isActive || !currentGameData) return
 
-  const hasAccess = await guardFeature('wincondition_tracker')
-  if (!hasAccess) return
+  // L'estimation locale est gratuite pour TOUS les tiers
+  // L'IA (Claude Haiku) enrichit pour le tier Elite
+  const hasEliteAccess = await guardFeature('wincondition_tracker')
+  let data: WinConditionData
 
-  const data = await generateWinCondition(currentGameData)
+  if (hasEliteAccess && anthropic && !DEV_MOCK_AI) {
+    data = await generateWinCondition(currentGameData)
+  } else {
+    data = generateLocalWinCondition(currentGameData)
+  }
+
   broadcastToWindows(IPC.WIN_CONDITION, data)
 }
 
 export function onGameStart(): void {
   isActive = true
-  lastMockWinProb = 50
+  lastLocalWinProb = 50
   // Premier tick après 10s pour avoir un premier feedback rapide
   initialTimeout = setTimeout(() => {
     initialTimeout = null
@@ -190,6 +234,6 @@ export function onGameEnd(): void {
     clearInterval(tracker)
     tracker = null
   }
-  lastMockWinProb = 50
+  lastLocalWinProb = 50
   console.log('[WinConditionTracker] Arrêté')
 }
