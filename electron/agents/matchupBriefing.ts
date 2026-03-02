@@ -9,6 +9,7 @@ import { IPC } from '../../shared/ipc-channels'
 import { guardFeature } from './subscriptionAgent'
 import { broadcastToWindows } from '../main/ipcHandlers'
 import type { GameData, MatchupBriefingData, CoachAdvice } from '../../shared/types'
+import { getChampion, getMatchupTip } from '../../shared/champion-data'
 
 let anthropic: Anthropic | null = null
 let briefingSent = false
@@ -173,9 +174,15 @@ function generateMockBriefing(myChampion: string, enemyChampion: string): Matchu
     summary = `Matchup skill-based contre ${enemyChampion}. La gestion des cooldowns et la vision décideront.`
   }
 
-  // Key tip
+  // Key tip — enrichi avec les données de champion-data.ts si disponibles
+  const matchupTipFromDB = getMatchupTip(enemyChampion)
+  const enemyInfo = getChampion(enemyChampion)
+
   let keyTip: string
-  if (enemy.burstDanger >= 5) {
+  if (matchupTipFromDB) {
+    // Conseil spécifique au champion depuis la base de données
+    keyTip = matchupTipFromDB
+  } else if (enemy.burstDanger >= 5) {
     keyTip = `Garde TOUJOURS un sort d'escape contre le burst de ${enemyChampion}. Un seul combo = mort si tu es à 60% HP.`
   } else if (me.lateStrength >= 5 && enemy.lateStrength <= 3) {
     keyTip = `Tu scales beaucoup mieux — ne force pas de fights risqués, chaque minute qui passe augmente ton avantage.`
@@ -185,6 +192,12 @@ function generateMockBriefing(myChampion: string, enemyChampion: string): Matchu
     keyTip = `Adapte ton style au matchup : trade quand tes sorts sont up, back off quand ils sont en cooldown.`
   }
 
+  // Enrichir le danger level avec champion-data si disponible
+  const dbDanger = enemyInfo?.dangerLevel ?? 0
+  const enrichedDanger = dbDanger >= 3 ? 'high' as const
+    : dbDanger >= 2 ? 'medium' as const
+    : dangerLevel
+
   return {
     summary,
     powerSpikes: [
@@ -192,20 +205,19 @@ function generateMockBriefing(myChampion: string, enemyChampion: string): Matchu
       { phase: 'mid', advantage: midAdv, tip: midTips[midAdv] },
       { phase: 'late', advantage: lateAdv, tip: lateTips[lateAdv] },
     ],
-    dangerLevel,
+    dangerLevel: enrichedDanger,
     keyTip,
   }
 }
 
 /**
  * Génère et broadcast le briefing matchup une fois au début de partie.
+ * Le briefing LOCAL est gratuit pour tous les tiers.
+ * L'enrichissement IA (Pro+) utilise Claude Haiku pour un briefing plus précis.
  */
 export async function triggerMatchupBriefing(gameData: GameData): Promise<void> {
   if (briefingSent) return
   if (!gameData.matchup) return
-
-  const hasAccess = await guardFeature('matchup_briefing')
-  if (!hasAccess) return
 
   briefingSent = true
   const myChampion = gameData.champion
@@ -215,9 +227,11 @@ export async function triggerMatchupBriefing(gameData: GameData): Promise<void> 
 
   let briefing: MatchupBriefingData
 
-  if (DEV_MOCK_AI) {
-    briefing = generateMockBriefing(myChampion, enemyChampion)
-  } else if (anthropic) {
+  // Vérifier si Pro+ pour l'enrichissement IA
+  const hasProAccess = await guardFeature('matchup_briefing')
+
+  if (hasProAccess && anthropic && !DEV_MOCK_AI) {
+    // Pro+ : essayer l'IA, fallback local
     try {
       const message = await anthropic.messages.create({
         model: 'claude-haiku-4-5-20251001',
@@ -232,7 +246,6 @@ export async function triggerMatchupBriefing(gameData: GameData): Promise<void> 
       if (text && text.type === 'text') {
         const fallback = generateMockBriefing(myChampion, enemyChampion)
         const parsed = JSON.parse(text.text) as MatchupBriefingData
-        // Validation : garder le mock si des champs critiques manquent
         briefing = {
           summary: parsed.summary ?? fallback.summary,
           powerSpikes: Array.isArray(parsed.powerSpikes) && parsed.powerSpikes.length === 3
@@ -247,10 +260,11 @@ export async function triggerMatchupBriefing(gameData: GameData): Promise<void> 
         briefing = generateMockBriefing(myChampion, enemyChampion)
       }
     } catch (err) {
-      console.error('[MatchupBriefing] Erreur API:', (err as Error).message)
+      console.error('[MatchupBriefing] Erreur API, fallback local:', (err as Error).message)
       briefing = generateMockBriefing(myChampion, enemyChampion)
     }
   } else {
+    // Free/Pro sans clé : briefing local (toujours utile)
     briefing = generateMockBriefing(myChampion, enemyChampion)
   }
 
