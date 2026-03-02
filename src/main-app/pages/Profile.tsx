@@ -3,7 +3,7 @@ import { useCoachingStore } from '../stores/coachingStore'
 import { COACHING_STYLES } from '../../../shared/constants'
 import { IPC } from '../../../shared/ipc-channels'
 import { getChampionIconUrl } from '../../../shared/champion-images'
-import { computeInsights } from '../../../shared/game-analysis'
+import { computeInsights, computeRoleStats } from '../../../shared/game-analysis'
 import type { RankedGame } from '../../../shared/types'
 
 // ─── Calcul des métriques GPI ─────────────────────────────────────────────────
@@ -239,6 +239,7 @@ export default function Profile() {
   const gpi = computeGPI(games)
   const championPool = computeChampionPool(games)
   const insights = computeInsights(games)
+  const roleStats = computeRoleStats(games)
   const recent20 = games.slice(0, 20)
   const recent10 = games.slice(0, 10)
 
@@ -466,6 +467,58 @@ export default function Profile() {
               )}
             </div>
           </div>
+
+          {/* Stats par rôle */}
+          {!loading && roleStats.length > 0 && (
+            <div
+              className="clip-bevel-lg p-4"
+              style={{
+                background: `linear-gradient(160deg, ${c.bg} 0%, ${c.border}40 100%)`,
+                border: `1px solid ${c.border}`,
+              }}
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-0.5 h-3.5 rounded-full" style={{ backgroundColor: '#C89B3C' }} />
+                <span className="text-[9px] font-black uppercase tracking-[0.2em]" style={{ color: c.text, opacity: 0.4 }}>
+                  Stats par rôle
+                </span>
+              </div>
+              <div className="grid gap-1.5">
+                {roleStats.map(rs => {
+                  const ROLE_LABEL: Record<string, string> = {
+                    TOP: 'Top', JUNGLE: 'Jungle', MIDDLE: 'Mid', BOTTOM: 'ADC', UTILITY: 'Support',
+                  }
+                  const ROLE_ICON: Record<string, string> = {
+                    TOP: '⚔', JUNGLE: '🌿', MIDDLE: '⭐', BOTTOM: '🏹', UTILITY: '🛡',
+                  }
+                  const wrColor = rs.winrate >= 55 ? '#22c55e' : rs.winrate >= 45 ? c.accent : '#ef4444'
+                  return (
+                    <div
+                      key={rs.role}
+                      className="flex items-center gap-2 clip-bevel-sm px-3 py-1.5"
+                      style={{ backgroundColor: `${c.border}30` }}
+                    >
+                      <span className="text-xs flex-shrink-0" title={rs.role}>
+                        {ROLE_ICON[rs.role] ?? '?'}
+                      </span>
+                      <span className="text-[10px] font-bold w-12 flex-shrink-0" style={{ color: c.text }}>
+                        {ROLE_LABEL[rs.role] ?? rs.role}
+                      </span>
+                      <span className="text-[10px] font-mono font-black w-10 text-right flex-shrink-0" style={{ color: wrColor }}>
+                        {rs.winrate}%
+                      </span>
+                      <div className="flex-1 h-1 rounded-full overflow-hidden mx-1" style={{ backgroundColor: `${c.border}` }}>
+                        <div className="h-full rounded-full" style={{ width: `${rs.winrate}%`, backgroundColor: wrColor }} />
+                      </div>
+                      <span className="text-[8px] font-mono flex-shrink-0" style={{ color: c.text, opacity: 0.35 }}>
+                        {rs.avgKda.toFixed(1)} KDA · {rs.avgCsMin}/min · {rs.games}G
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Champion pool */}
           <div

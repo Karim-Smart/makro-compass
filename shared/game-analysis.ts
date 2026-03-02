@@ -96,6 +96,50 @@ export function computeRollingWinrate(games: RankedGame[], window = 5): number[]
   return result
 }
 
+// ─── Stats par rôle ───────────────────────────────────────────────────────────
+
+export interface RoleStat {
+  role: string
+  games: number
+  wins: number
+  winrate: number
+  avgKda: number
+  avgCsMin: number
+  avgVisionMin: number
+}
+
+/**
+ * Calcule les statistiques agrégées par rôle.
+ */
+export function computeRoleStats(games: RankedGame[]): RoleStat[] {
+  const map: Record<string, { games: number; wins: number; kdaSum: number; csSum: number; timeSum: number; visionSum: number }> = {}
+
+  for (const g of games) {
+    const role = g.role ?? 'UNKNOWN'
+    if (!map[role]) map[role] = { games: 0, wins: 0, kdaSum: 0, csSum: 0, timeSum: 0, visionSum: 0 }
+    const e = map[role]
+    e.games++
+    if (g.result === 'win') e.wins++
+    e.kdaSum += g.deaths === 0 ? 5 : (g.kills + g.assists) / g.deaths
+    e.csSum += g.cs
+    e.timeSum += g.gameTime
+    e.visionSum += g.wardScore
+  }
+
+  return Object.entries(map)
+    .filter(([role]) => role !== 'UNKNOWN')
+    .map(([role, s]) => ({
+      role,
+      games: s.games,
+      wins: s.wins,
+      winrate: Math.round((s.wins / s.games) * 100),
+      avgKda: Math.round((s.kdaSum / s.games) * 100) / 100,
+      avgCsMin: s.timeSum > 0 ? Math.round((s.csSum / (s.timeSum / 60)) * 10) / 10 : 0,
+      avgVisionMin: s.timeSum > 0 ? Math.round((s.visionSum / (s.timeSum / 60)) * 100) / 100 : 0,
+    }))
+    .sort((a, b) => b.games - a.games)
+}
+
 // ─── Insights comportementaux ────────────────────────────────────────────────
 
 export interface Insight {
