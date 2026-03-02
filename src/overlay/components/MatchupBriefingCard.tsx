@@ -41,14 +41,14 @@ export function MatchupBriefingCard({ data, colors: c }: Props) {
   const dangerColor = getDangerColor(data.dangerLevel)
 
   return (
-    <div className="px-3 py-1.5 flex flex-col gap-1 overflow-hidden overlay-glass" style={{ maxHeight: 160 }}>
+    <div className="px-3 py-1.5 flex flex-col gap-1 overflow-hidden overlay-glass clip-bevel animate-card-enter" style={{ maxHeight: 160 }}>
       {/* Header : MATCHUP + danger level */}
       <div className="flex items-center justify-between">
-        <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: c.accent, opacity: 0.5 }}>
+        <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: '#C89B3C', opacity: 0.5 }}>
           matchup briefing
         </span>
         <span
-          className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded"
+          className="text-[8px] font-black uppercase px-1.5 py-0.5 clip-bevel-sm"
           style={{ color: '#fff', background: dangerColor }}
         >
           {getDangerLabel(data.dangerLevel)}

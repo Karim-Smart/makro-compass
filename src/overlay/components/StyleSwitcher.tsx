@@ -59,8 +59,8 @@ export function StyleSwitcher({ selectedStyle }: Props) {
       <div
         className="px-2 pt-2 pb-1 text-[7px] font-black uppercase tracking-[0.25em] text-center"
         style={{
-          color: 'rgba(255,255,255,0.2)',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          color: '#C89B3C50',
+          borderBottom: '1px solid #C89B3C15',
           // @ts-expect-error: propriété CSS Electron pour le drag
           WebkitAppRegion: 'drag',
         }}

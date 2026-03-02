@@ -137,16 +137,25 @@ function IconCrown() {
 
 // ─── Items de navigation ──────────────────────────────────────────────────────
 
-const NAV_ITEMS = [
-  { path: '/profile',   label: 'Profil',     Icon: IconUser     },
-  { path: '/dashboard', label: 'Dashboard',  Icon: IconGrid     },
-  { path: '/draft',     label: 'Draft',      Icon: IconSwords   },
-  { path: '/runes',     label: 'Runes',      Icon: IconRunes    },
-  { path: '/build',     label: 'Build',      Icon: IconBuild    },
-  { path: '/stats',     label: 'Classées',   Icon: IconBarChart },
-  { path: '/style',     label: 'Style',      Icon: IconGlobe    },
-  { path: '/pricing',   label: 'Plans',      Icon: IconCrown    },
-  { path: '/settings',  label: 'Paramètres', Icon: IconGear     },
+// Groupes de navigation avec séparateurs
+const NAV_GROUPS = [
+  [
+    { path: '/profile',   label: 'Profil',    Icon: IconUser     },
+    { path: '/dashboard', label: 'Dashboard', Icon: IconGrid     },
+  ],
+  [
+    { path: '/draft',     label: 'Draft',     Icon: IconSwords   },
+    { path: '/runes',     label: 'Runes',     Icon: IconRunes    },
+    { path: '/build',     label: 'Build',     Icon: IconBuild    },
+  ],
+  [
+    { path: '/stats',     label: 'Classées',  Icon: IconBarChart },
+  ],
+  [
+    { path: '/style',     label: 'Style',      Icon: IconGlobe   },
+    { path: '/pricing',   label: 'Plans',      Icon: IconCrown   },
+    { path: '/settings',  label: 'Paramètres', Icon: IconGear    },
+  ],
 ] as const
 
 // ─── App ──────────────────────────────────────────────────────────────────────
@@ -178,44 +187,56 @@ function App() {
 
         {/* ── Barre de navigation LoL ── */}
         <nav
-          className="flex items-center gap-0.5 px-3 py-0 flex-shrink-0"
+          className="flex items-center px-2 py-0 flex-shrink-0"
           style={{
             backgroundColor: 'var(--hextech-blue-3)',
             borderBottom: '1px solid rgba(200, 155, 60, 0.2)',
           }}
         >
-          {/* Liens */}
-          {NAV_ITEMS.map(({ path, label, Icon }) => (
-            <NavLink
-              key={path}
-              to={path}
-              className="nav-link-hover flex items-center gap-1.5 px-3 py-2 text-xs font-semibold relative"
-              style={({ isActive }) => ({
-                color: isActive ? 'var(--hextech-gold)' : 'var(--hextech-silver)',
-                opacity: isActive ? 1 : 0.6,
-              })}
-            >
-              {({ isActive }) => (
-                <>
-                  <span style={{
-                    color: isActive ? 'var(--hextech-gold)' : 'currentColor',
-                    transition: 'color 0.15s ease',
-                  }}>
-                    <Icon />
-                  </span>
-                  {label}
-                  {/* Bordure basse dorée animée */}
-                  <div
-                    className="absolute bottom-0 left-2 right-2 h-0.5"
-                    style={{
-                      background: 'linear-gradient(90deg, transparent, var(--hextech-gold), transparent)',
-                      transform: isActive ? 'scaleX(1)' : 'scaleX(0)',
-                      transition: 'transform 0.2s ease',
-                    }}
-                  />
-                </>
+          {NAV_GROUPS.map((group, gi) => (
+            <div key={gi} className="flex items-center">
+              {/* Séparateur doré entre groupes */}
+              {gi > 0 && (
+                <div
+                  className="w-px mx-1 self-stretch"
+                  style={{
+                    background: 'linear-gradient(180deg, transparent, #C89B3C25, transparent)',
+                  }}
+                />
               )}
-            </NavLink>
+              {group.map(({ path, label, Icon }) => (
+                <NavLink
+                  key={path}
+                  to={path}
+                  className="nav-link-hover flex items-center gap-1.5 px-2.5 py-2 text-xs font-semibold relative"
+                  style={({ isActive }) => ({
+                    color: isActive ? 'var(--hextech-gold)' : 'var(--hextech-silver)',
+                    opacity: isActive ? 1 : 0.6,
+                  })}
+                >
+                  {({ isActive }) => (
+                    <>
+                      <span style={{
+                        color: isActive ? 'var(--hextech-gold)' : 'currentColor',
+                        transition: 'color 0.15s ease',
+                      }}>
+                        <Icon />
+                      </span>
+                      {label}
+                      {/* Bordure basse dorée animée */}
+                      <div
+                        className="absolute bottom-0 left-2 right-2 h-0.5"
+                        style={{
+                          background: 'linear-gradient(90deg, transparent, var(--hextech-gold), transparent)',
+                          transform: isActive ? 'scaleX(1)' : 'scaleX(0)',
+                          transition: 'transform 0.2s ease',
+                        }}
+                      />
+                    </>
+                  )}
+                </NavLink>
+              ))}
+            </div>
           ))}
         </nav>
 
