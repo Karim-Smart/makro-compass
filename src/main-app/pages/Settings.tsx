@@ -35,10 +35,10 @@ function Toggle({ active, onToggle, accent, border }: {
 function SectionHeader({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle?: string }) {
   return (
     <div className="flex items-center gap-2.5 mb-3">
-      <div className="text-gray-500 flex-shrink-0">{icon}</div>
+      <div className="flex-shrink-0" style={{ color: '#C89B3C' }}>{icon}</div>
       <div>
-        <div className="text-xs font-black uppercase tracking-[0.22em] text-white opacity-70">{title}</div>
-        {subtitle && <div className="text-[9px] text-gray-600 mt-0.5">{subtitle}</div>}
+        <div className="text-xs font-black uppercase tracking-[0.22em]" style={{ color: '#F0E6D2', opacity: 0.8 }}>{title}</div>
+        {subtitle && <div className="text-[9px] mt-0.5" style={{ color: '#A0A7B4' }}>{subtitle}</div>}
       </div>
     </div>
   )
@@ -102,12 +102,12 @@ export default function Settings() {
 
         {/* ─── Header page ─── */}
         <div className="flex items-center gap-3 mb-1">
-          <div className="w-0.5 h-5 rounded-full" style={{ backgroundColor: c.accent }} />
-          <h1 className="text-base font-black text-white tracking-tight">Paramètres</h1>
+          <div className="w-0.5 h-5 rounded-full" style={{ backgroundColor: '#C89B3C' }} />
+          <h1 className="text-base font-black tracking-tight" style={{ color: '#F0E6D2', fontFamily: 'Cinzel, serif' }}>Paramètres</h1>
         </div>
 
         {/* ─── Layout 2 colonnes ─── */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4 stagger-enter">
 
           {/* ── Colonne gauche ── */}
           <div className="flex flex-col gap-4">
@@ -403,9 +403,9 @@ export default function Settings() {
                 onClick={() => navigate('/pricing')}
                 className="w-full py-2 clip-bevel text-xs font-bold transition-all hover:scale-[1.02]"
                 style={{
-                  backgroundColor: tier === 'free' ? '#9B6EF320' : `${c.accent}15`,
-                  color: tier === 'free' ? '#9B6EF3' : c.accent,
-                  border: `1px solid ${tier === 'free' ? '#9B6EF340' : c.accent + '30'}`,
+                  backgroundColor: tier === 'free' ? '#C89B3C18' : `${c.accent}15`,
+                  color: tier === 'free' ? '#C89B3C' : c.accent,
+                  border: `1px solid ${tier === 'free' ? '#C89B3C40' : c.accent + '30'}`,
                 }}
               >
                 {tier === 'free' ? 'Passer à Pro' : 'Gérer mon abonnement'}
@@ -415,19 +415,19 @@ export default function Settings() {
             {/* Info version */}
             <div
               className="clip-bevel-lg p-3 flex items-center justify-between"
-              style={{ background: `${c.bg}80`, border: `1px solid ${c.border}40` }}
+              style={{ background: '#0A1628', border: '1px solid #C89B3C15' }}
             >
               <div>
-                <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: c.text, opacity: 0.3 }}>
-                  maKro Compass
+                <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: '#C89B3C', opacity: 0.5 }}>
+                  ma<span style={{ color: '#F0E6D2' }}>K</span>ro Compass
                 </div>
-                <div className="text-[10px] font-mono" style={{ color: c.text, opacity: 0.2 }}>
+                <div className="text-[10px] font-mono" style={{ color: '#A0A7B4', opacity: 0.3 }}>
                   v0.1.0 · {selectedStyle} style
                 </div>
               </div>
               <div
                 className="text-[8px] font-black px-2 py-1 clip-bevel-sm tracking-widest"
-                style={{ backgroundColor: `${c.accent}15`, color: c.accent, opacity: 0.6 }}
+                style={{ backgroundColor: '#C89B3C15', color: '#C89B3C', opacity: 0.7 }}
               >
                 BETA
               </div>

@@ -54,7 +54,7 @@ export default function StylePicker() {
             <div className="text-[9px] font-black uppercase tracking-[0.25em] mb-1" style={{ color: current.colors.accent, opacity: 0.6 }}>
               Style de coaching
             </div>
-            <h1 className="text-2xl font-black text-white tracking-tight mb-1">
+            <h1 className="text-2xl font-black tracking-tight mb-1" style={{ color: '#F0E6D2', fontFamily: 'Cinzel, serif' }}>
               Choisis ta philosophie
             </h1>
             <p className="text-xs opacity-40 text-white max-w-md">
@@ -77,7 +77,7 @@ export default function StylePicker() {
 
       {/* ─── Grille 2×2 ─── */}
       <div className="flex-1 px-6 pb-4 overflow-auto">
-        <div className="grid grid-cols-2 gap-3 max-w-3xl mx-auto">
+        <div className="grid grid-cols-2 gap-3 max-w-3xl mx-auto stagger-enter">
           {STYLES.map((style) => {
             const locked = !hasAllStyles && style !== 'LCK'
             return (
@@ -91,7 +91,7 @@ export default function StylePicker() {
                   <div className="absolute inset-0 clip-bevel-lg flex items-center justify-center bg-black/50 backdrop-blur-sm">
                     <span
                       className="px-3 py-1 clip-bevel-sm text-[10px] font-black uppercase tracking-wider"
-                      style={{ backgroundColor: '#9B6EF330', color: '#9B6EF3', border: '1px solid #9B6EF350' }}
+                      style={{ backgroundColor: '#C89B3C25', color: '#C89B3C', border: '1px solid #C89B3C50' }}
                     >
                       {TIER_LABELS.pro} requis
                     </span>
