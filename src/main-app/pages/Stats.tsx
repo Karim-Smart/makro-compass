@@ -182,7 +182,7 @@ export default function Stats() {
       {/* ─── Header ─── */}
       <div className="px-5 pt-5 pb-0 flex-shrink-0">
         <div className="flex items-center justify-between mb-3">
-          <h1 className="text-base font-black text-white tracking-tight">Parties classées</h1>
+          <h1 className="text-base font-black tracking-tight" style={{ color: '#F0E6D2', fontFamily: 'Cinzel, serif' }}>Parties classées</h1>
           <FeatureLock feature="ranked_import">
             <button
               onClick={handleImport}
@@ -201,8 +201,8 @@ export default function Stats() {
           <div
             className="clip-bevel-lg p-3 mb-3 grid grid-cols-5 gap-0"
             style={{
-              background: `linear-gradient(135deg, ${c.bg} 0%, ${c.border}50 100%)`,
-              border: `1px solid ${c.border}`,
+              background: `linear-gradient(135deg, #0A1628 0%, ${c.border}40 100%)`,
+              border: `1px solid #C89B3C20`,
             }}
           >
             {[
@@ -239,12 +239,12 @@ export default function Stats() {
                 <div
                   key={i}
                   title={result === 1 ? 'Victoire' : 'Défaite'}
-                  className="rounded-sm transition-transform hover:scale-125"
+                  className="clip-bevel-sm transition-transform hover:scale-125"
                   style={{
-                    width: 13,
-                    height: 13,
-                    backgroundColor: result === 1 ? '#22c55e20' : '#ef444420',
-                    border: `1px solid ${result === 1 ? '#22c55e55' : '#ef444455'}`,
+                    width: 14,
+                    height: 14,
+                    backgroundColor: result === 1 ? '#22c55e15' : '#ef444415',
+                    border: `1px solid ${result === 1 ? '#22c55e50' : '#ef444450'}`,
                   }}
                 />
               ))}
@@ -298,7 +298,7 @@ export default function Stats() {
         </div>
 
         {/* Séparateur */}
-        <div className="h-px -mx-5" style={{ backgroundColor: c.border }} />
+        <div className="h-px -mx-5" style={{ background: `linear-gradient(90deg, transparent, #C89B3C30, transparent)` }} />
       </div>
 
       {/* ─── Liste des parties ─── */}

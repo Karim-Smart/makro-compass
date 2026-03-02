@@ -282,21 +282,21 @@ export default function Profile() {
       <div
         className="clip-bevel-lg px-5 py-4 flex items-center justify-between"
         style={{
-          background: `linear-gradient(135deg, ${c.bg} 0%, ${c.border}70 100%)`,
-          border: `1px solid ${c.border}`,
-          boxShadow: `0 0 40px ${c.accent}10`,
+          background: `linear-gradient(135deg, #0A1628 0%, ${c.border}50 100%)`,
+          border: `1px solid #C89B3C25`,
+          boxShadow: `0 0 40px #C89B3C08`,
         }}
       >
         <div className="flex items-center gap-4">
           {/* Avatar placeholder */}
           <div
             className="w-12 h-12 clip-bevel flex items-center justify-center font-black text-lg flex-shrink-0"
-            style={{ background: `${c.accent}20`, border: `1.5px solid ${c.accent}50`, color: c.accent }}
+            style={{ background: '#C89B3C20', border: '1.5px solid #C89B3C50', color: '#C89B3C' }}
           >
             {selectedStyle}
           </div>
           <div>
-            <div className="font-black text-white text-base leading-tight">Summoner</div>
+            <div className="font-black text-base leading-tight" style={{ color: '#F0E6D2', fontFamily: 'Cinzel, serif' }}>Summoner</div>
             <div className="text-[10px] font-mono mt-0.5" style={{ color: c.text, opacity: 0.4 }}>
               {style.label} · {style.region}
             </div>
@@ -340,7 +340,7 @@ export default function Profile() {
             }}
           >
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-0.5 h-3.5 rounded-full" style={{ backgroundColor: c.accent }} />
+              <div className="w-0.5 h-3.5 rounded-full" style={{ backgroundColor: '#C89B3C' }} />
               <span className="text-[9px] font-black uppercase tracking-[0.2em]" style={{ color: c.text, opacity: 0.4 }}>
                 Performance GPI
               </span>
@@ -422,12 +422,12 @@ export default function Profile() {
                     <div
                       key={i}
                       title={`${g.champion} · ${g.kills}/${g.deaths}/${g.assists}`}
-                      className="rounded font-black text-[8px] flex items-center justify-center transition-transform hover:scale-110"
+                      className="clip-bevel-sm font-black text-[8px] flex items-center justify-center transition-transform hover:scale-110"
                       style={{
-                        width: 20,
-                        height: 20,
-                        backgroundColor: g.result === 'win' ? '#22c55e20' : '#ef444420',
-                        border: `1px solid ${g.result === 'win' ? '#22c55e60' : '#ef444460'}`,
+                        width: 22,
+                        height: 22,
+                        backgroundColor: g.result === 'win' ? '#22c55e15' : '#ef444415',
+                        border: `1px solid ${g.result === 'win' ? '#22c55e50' : '#ef444450'}`,
                         color: g.result === 'win' ? '#22c55e' : '#ef4444',
                       }}
                     >
@@ -476,7 +476,7 @@ export default function Profile() {
             }}
           >
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-0.5 h-3.5 rounded-full" style={{ backgroundColor: c.accent }} />
+              <div className="w-0.5 h-3.5 rounded-full" style={{ backgroundColor: '#C89B3C' }} />
               <span className="text-[9px] font-black uppercase tracking-[0.2em]" style={{ color: c.text, opacity: 0.4 }}>
                 Champion Pool
               </span>
@@ -489,7 +489,7 @@ export default function Profile() {
                 Aucune partie classée enregistrée
               </div>
             ) : (
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col gap-2.5 stagger-enter">
                 {championPool.map((champ, rank) => {
                   const wr = Math.round((champ.wins / champ.games) * 100)
                   const wrColor = wr >= 55 ? '#22c55e' : wr >= 45 ? c.accent : '#ef4444'
@@ -586,7 +586,7 @@ export default function Profile() {
               }}
             >
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-0.5 h-3.5 rounded-full" style={{ backgroundColor: c.accent }} />
+                <div className="w-0.5 h-3.5 rounded-full" style={{ backgroundColor: '#C89B3C' }} />
                 <span className="text-[9px] font-black uppercase tracking-[0.2em]" style={{ color: c.text, opacity: 0.4 }}>
                   Insights
                 </span>
