@@ -23,7 +23,7 @@ import { getOverlayWindows, setPanelSettings, setOverlayTier } from './windowMan
 
 // ─── Persistance des settings ─────────────────────────────────────────────────
 
-const DEFAULT_OVERLAY_PANELS = { stats: true, timers: true, advice: true, style: true, build: true, wincondition: false }
+const DEFAULT_OVERLAY_PANELS = { stats: true, timers: true, advice: true, style: true, build: true, wincondition: false, scoreboard: true }
 
 const DEFAULT_SETTINGS: UserSettings = {
   hotkey: 'F9',

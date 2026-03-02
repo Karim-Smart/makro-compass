@@ -190,7 +190,7 @@ function parseGameData(raw: RiotApiResponse): GameData {
     }
   }
 
-  // ─── Estimation du gold par équipe ──────────────────────────────
+  // ─── Estimation du gold par joueur et par équipe ─────────────────
   // L'API Live Client ne fournit pas le gold total — on l'estime à partir de :
   //   kills × 300 + assists × 150 + CS × 20 + gold de base passif (≈2/s après 2min)
   // Ce n'est pas exact mais permet des comparaisons relatives fiables.
@@ -198,17 +198,38 @@ function parseGameData(raw: RiotApiResponse): GameData {
   let estimatedTeamGold  = 0
   let estimatedEnemyGold = 0
 
+  const players: import('../../shared/types').PlayerInfo[] = []
+
   for (const p of raw.allPlayers ?? []) {
     const pKills   = p.scores?.kills      ?? 0
+    const pDeaths  = p.scores?.deaths     ?? 0
     const pAssists = p.scores?.assists    ?? 0
     const pCs      = p.scores?.creepScore ?? 0
     const estimated = pKills * 300 + pAssists * 150 + pCs * 20 + passiveGoldPerPlayer
+    const pChamp = p.championName ?? p.summonerName ?? '?'
+    const isAlly = p.team === myTeam
+    const isMe = pChamp === championName
 
-    if (p.team === myTeam) {
+    if (isAlly) {
       estimatedTeamGold += estimated
     } else {
       estimatedEnemyGold += estimated
     }
+
+    players.push({
+      champion: pChamp,
+      team: isAlly ? 'ally' : 'enemy',
+      position: p.position ?? '',
+      kills: pKills,
+      deaths: pDeaths,
+      assists: pAssists,
+      cs: pCs,
+      level: p.level ?? 1,
+      estimatedGold: Math.round(estimated),
+      items: (p.items ?? []).map((item) => item.displayName).filter((n) => n && n !== 'Stealth Ward'),
+      isDead: p.isDead ?? false,
+      isMe,
+    })
   }
 
   return {
@@ -241,6 +262,7 @@ function parseGameData(raw: RiotApiResponse): GameData {
     wardScore: activePlayerData?.scores?.wardScore ?? 0,
     gameMode: raw.gameData?.gameMode ?? 'CLASSIC',
     matchup,
+    players,
   }
 }
 

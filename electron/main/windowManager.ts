@@ -6,13 +6,14 @@ import { canAccess } from '../../shared/feature-gates'
 
 let mainWindow: BrowserWindow | null = null
 
-// 6 fenêtres overlay indépendantes (opaques, draggables)
+// 7 fenêtres overlay indépendantes
 let statsWindow: BrowserWindow | null = null
 let timersWindow: BrowserWindow | null = null
 let adviceWindow: BrowserWindow | null = null
 let styleWindow: BrowserWindow | null = null
 let buildWindow: BrowserWindow | null = null
 let winconditionWindow: BrowserWindow | null = null
+let scoreboardWindow: BrowserWindow | null = null
 
 // Préférences de visibilité par panneau (par défaut tout activé sauf wincondition)
 let panelSettings: OverlayPanels = {
@@ -22,6 +23,7 @@ let panelSettings: OverlayPanels = {
   style: true,
   build: true,
   wincondition: false,
+  scoreboard: true,
 }
 
 // true quand l'overlay est globalement affiché (partie en cours)
@@ -204,7 +206,17 @@ export function createOverlayWindows(): BrowserWindow[] {
   })
   winconditionWindow.on('closed', () => { winconditionWindow = null })
 
-  return [statsWindow, timersWindow, adviceWindow, styleWindow, buildWindow, winconditionWindow]
+  // Scoreboard — bas centre (5v5 gold diff style Blitz)
+  scoreboardWindow = createPanelWindow({
+    panel: 'scoreboard',
+    width: 420,
+    height: 220,
+    x: Math.round(sw / 2 - 210),
+    y: sh - 240,
+  })
+  scoreboardWindow.on('closed', () => { scoreboardWindow = null })
+
+  return [statsWindow, timersWindow, adviceWindow, styleWindow, buildWindow, winconditionWindow, scoreboardWindow]
 }
 
 // ─── Accesseurs ───────────────────────────────────────────────────────────────
@@ -214,7 +226,7 @@ export function getMainWindow(): BrowserWindow | null {
 }
 
 export function getOverlayWindows(): BrowserWindow[] {
-  return [statsWindow, timersWindow, adviceWindow, styleWindow, buildWindow, winconditionWindow].filter(
+  return [statsWindow, timersWindow, adviceWindow, styleWindow, buildWindow, winconditionWindow, scoreboardWindow].filter(
     (w): w is BrowserWindow => w !== null && !w.isDestroyed()
   )
 }
@@ -228,6 +240,7 @@ function getPanelWindow(panel: keyof OverlayPanels): BrowserWindow | null {
     style: styleWindow,
     build: buildWindow,
     wincondition: winconditionWindow,
+    scoreboard: scoreboardWindow,
   }
   return map[panel]
 }

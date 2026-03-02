@@ -51,6 +51,7 @@ const PANEL_META: { key: keyof OverlayPanels; label: string; desc: string; pos: 
   { key: 'style',         label: 'Switch de style',     desc: 'LCK / LEC / LCS / LPL',       pos: 'Milieu →' },
   { key: 'build',         label: 'Build recommandé',    desc: 'Items situationnels',          pos: 'Milieu →' },
   { key: 'wincondition',  label: 'Win Condition',       desc: 'Probabilité victoire (Elite)', pos: 'Haut ↑'  },
+  { key: 'scoreboard',   label: 'Scoreboard',          desc: 'Gold diff par lane (5v5)',     pos: 'Bas ↓'   },
 ]
 
 const REGIONS = ['EUW', 'EUNE', 'NA', 'KR', 'CN', 'BR', 'LAN', 'LAS', 'OCE', 'TR', 'RU']

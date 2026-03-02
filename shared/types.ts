@@ -42,6 +42,22 @@ export interface RuneSetup {
 // Tiers d'abonnement
 export type SubscriptionTier = 'free' | 'pro' | 'elite'
 
+// Données par joueur (pour le scoreboard overlay)
+export interface PlayerInfo {
+  champion: string
+  team: 'ally' | 'enemy'
+  position: string   // TOP, JUNGLE, MIDDLE, BOTTOM, UTILITY
+  kills: number
+  deaths: number
+  assists: number
+  cs: number
+  level: number
+  estimatedGold: number
+  items: string[]
+  isDead: boolean
+  isMe: boolean
+}
+
 // Données brutes d'une partie League of Legends
 export interface GameData {
   isInGame: boolean
@@ -93,6 +109,8 @@ export interface GameData {
     oppKda: { kills: number; deaths: number; assists: number }
     oppCs: number
   } | null
+  // Scoreboard : tous les 10 joueurs avec gold estimé (pour le scoreboard overlay)
+  players: PlayerInfo[]
 }
 
 // Alerte courte (3s) pour événements in-game
@@ -155,6 +173,7 @@ export interface OverlayPanels {
   style: boolean        // Switch de style LCK/LEC/… (droite)
   build: boolean        // Build recommandé (droite)
   wincondition: boolean // Win condition tracker (haut-centre, Elite)
+  scoreboard: boolean   // Scoreboard 5v5 gold diff (bas-centre)
 }
 
 // Paramètres utilisateur

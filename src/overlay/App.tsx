@@ -16,6 +16,7 @@ import { ReviewEventOverlay } from './components/ReviewEventOverlay'
 import { WinConditionOverlay } from './components/WinConditionOverlay'
 import { MatchupBriefingCard } from './components/MatchupBriefingCard'
 import { TiltIndicator } from './components/TiltIndicator'
+import { ScoreboardOverlay } from './components/ScoreboardOverlay'
 
 // Lire le panel à afficher depuis l'URL (?panel=stats|timers|advice)
 const params = new URLSearchParams(window.location.search)
@@ -398,6 +399,12 @@ export default function OverlayApp() {
       {panel === 'wincondition' && winCondition && (
         <div className="overlay-glass h-full animate-panel-top">
           <WinConditionOverlay data={winCondition} colors={colors} />
+        </div>
+      )}
+
+      {panel === 'scoreboard' && inGame && gameData && gameData.players.length > 0 && (
+        <div className="h-full animate-panel-bottom">
+          <ScoreboardOverlay players={gameData.players} colors={colors} />
         </div>
       )}
 
