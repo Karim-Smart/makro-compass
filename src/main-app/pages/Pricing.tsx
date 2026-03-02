@@ -1,6 +1,5 @@
-import { useCoachingStore } from '../stores/coachingStore'
 import { useSubscriptionStore } from '../stores/subscriptionStore'
-import { COACHING_STYLES, TIER_PRICING, TIER_LABELS } from '../../../shared/constants'
+import { TIER_PRICING, TIER_LABELS } from '../../../shared/constants'
 import { IPC } from '../../../shared/ipc-channels'
 import type { SubscriptionTier } from '../../../shared/types'
 
@@ -58,8 +57,6 @@ function FeatureCell({ value, accentColor }: { value: boolean | string; accentCo
 }
 
 export default function Pricing() {
-  const selectedStyle = useCoachingStore((s) => s.selectedStyle)
-  const c = COACHING_STYLES[selectedStyle].colors
   const currentTier = useSubscriptionStore((s) => s.status?.tier ?? 'free')
 
   const handleUpgrade = (tier: SubscriptionTier) => {
@@ -68,19 +65,22 @@ export default function Pricing() {
   }
 
   const tiers: { key: SubscriptionTier; accent: string; border: string }[] = [
-    { key: 'free',  accent: c.text,    border: c.border },
-    { key: 'pro',   accent: '#9B6EF3', border: '#3D1F6B' },
+    { key: 'free',  accent: '#A0A7B4', border: '#1E2328' },
+    { key: 'pro',   accent: '#C89B3C', border: '#785A28' },
     { key: 'elite', accent: '#FFD700', border: '#5C4A00' },
   ]
 
   return (
-    <div className="h-full overflow-y-auto px-6 py-6" style={{ backgroundColor: c.bg }}>
+    <div className="h-full overflow-y-auto px-6 py-6" style={{ backgroundColor: '#010A13' }}>
       {/* Header */}
       <div className="text-center mb-8">
-        <h1 className="text-2xl font-black mb-2" style={{ color: c.accent }}>
+        <div className="text-[9px] font-black uppercase tracking-[0.3em] mb-2" style={{ color: '#C89B3C', opacity: 0.5 }}>
+          Abonnement
+        </div>
+        <h1 className="text-2xl font-black mb-2" style={{ color: '#F0E6D2', fontFamily: 'Cinzel, serif' }}>
           Choisis ton plan
         </h1>
-        <p className="text-sm opacity-60" style={{ color: c.text }}>
+        <p className="text-sm" style={{ color: '#A0A7B4', opacity: 0.6 }}>
           Débloque les fonctionnalités IA avancées pour dominer la Faille
         </p>
       </div>
@@ -98,7 +98,7 @@ export default function Pricing() {
               key={key}
               className={`clip-bevel-lg p-5 flex flex-col items-center gap-3 transition-all ${isElite && !isCurrent ? 'gold-pulse' : ''}`}
               style={{
-                backgroundColor: `${c.bg}`,
+                backgroundColor: '#0A1628',
                 border: `2px solid ${isCurrent ? accent : border}`,
                 boxShadow: isCurrent ? `0 0 20px ${accent}30` : 'none',
               }}
@@ -121,7 +121,7 @@ export default function Pricing() {
                   {price === 0 ? 'Gratuit' : `${price}€`}
                 </span>
                 {price > 0 && (
-                  <span className="text-xs opacity-50 ml-1" style={{ color: c.text }}>/mois</span>
+                  <span className="text-xs opacity-50 ml-1" style={{ color: '#A0A7B4' }}>/mois</span>
                 )}
               </div>
 
@@ -151,13 +151,13 @@ export default function Pricing() {
       </div>
 
       {/* Tableau comparatif */}
-      <div className="max-w-3xl mx-auto clip-bevel-lg overflow-hidden" style={{ border: `1px solid ${c.border}` }}>
+      <div className="max-w-3xl mx-auto clip-bevel-lg overflow-hidden" style={{ border: '1px solid #1E2328' }}>
         <table className="w-full">
           <thead>
-            <tr style={{ backgroundColor: `${c.border}40` }}>
-              <th className="text-left px-4 py-2 text-xs font-bold" style={{ color: c.text }}>Fonctionnalité</th>
+            <tr style={{ backgroundColor: '#0A162880', borderBottom: '1px solid #C89B3C20' }}>
+              <th className="text-left px-4 py-2.5 text-xs font-bold" style={{ color: '#F0E6D2' }}>Fonctionnalité</th>
               {tiers.map(({ key, accent }) => (
-                <th key={key} className="px-4 py-2 text-xs font-bold text-center" style={{ color: accent }}>
+                <th key={key} className="px-4 py-2.5 text-xs font-bold text-center" style={{ color: accent }}>
                   {TIER_LABELS[key]}
                 </th>
               ))}
@@ -168,11 +168,11 @@ export default function Pricing() {
               <tr
                 key={feat.label}
                 style={{
-                  backgroundColor: i % 2 === 0 ? 'transparent' : `${c.border}20`,
-                  borderTop: `1px solid ${c.border}30`,
+                  backgroundColor: i % 2 === 0 ? 'transparent' : '#0A162840',
+                  borderTop: '1px solid #1E232830',
                 }}
               >
-                <td className="px-4 py-2 text-xs" style={{ color: c.text }}>{feat.label}</td>
+                <td className="px-4 py-2 text-xs" style={{ color: '#A0A7B4' }}>{feat.label}</td>
                 {tiers.map(({ key, accent }) => (
                   <td key={key} className="px-4 py-2 text-center">
                     <div className="flex justify-center">

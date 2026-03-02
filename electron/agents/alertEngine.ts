@@ -24,6 +24,10 @@ let goldDiffTrend      = 0    // positif = on gagne du terrain, négatif = on pe
 let prevCs             = 0
 let prevGameTime       = 0
 let lastGoldTrendAlert = 0    // gameTime du dernier rappel tendance
+let csPmHistory: number[] = [] // CS/min snapshots pour détecter les drops
+let lastCsDropAlert    = 0    // gameTime du dernier rappel CS drop
+let prevDeathCount     = -1
+let lastDeathAlert     = 0    // gameTime de la dernière alerte mort
 
 // ─── API publique ────────────────────────────────────────────────────────────
 
@@ -44,6 +48,10 @@ export function resetAlertEngine(): void {
   prevCs           = 0
   prevGameTime     = 0
   lastGoldTrendAlert = 0
+  csPmHistory.length = 0
+  lastCsDropAlert  = 0
+  prevDeathCount   = -1
+  lastDeathAlert   = 0
 }
 
 /**
@@ -214,20 +222,40 @@ export function detectAlerts(gameData: GameData): GameAlert[] {
     }
   }
 
-  // ─── CS SPIKE (excellente phase de CS) ──────────────────────────
+  // ─── CS/MIN DROP DETECTION ──────────────────────────────────────
 
-  if (prevCs > 0 && gameData.cs > prevCs) {
-    const deltaCs = gameData.cs - prevCs
-    const deltaTime = gameTime - (prevGameTime > 0 ? prevGameTime : gameTime)
-    if (deltaTime > 0 && deltaTime < 15) {
-      const instantCspm = (deltaCs / deltaTime) * 60
-      // Si on a un CS/min instantané > 10, c'est une excellente séquence
-      if (instantCspm > 10 && gameData.cs > 50) {
-        // Pas d'alerte, trop spammant — on laisse macroTips gérer
+  if (gameTime >= 300 && gameData.cs > 0) {
+    const currentCspm = (gameData.cs / gameTime) * 60
+    // Snapshot toutes les ~30s (6 polls à 5s)
+    if (csPmHistory.length === 0 || gameTime - prevGameTime >= 25) {
+      csPmHistory.push(currentCspm)
+      if (csPmHistory.length > 12) csPmHistory.shift() // ~6 min de données
+    }
+    // Si on a assez de données et que le CS/min a chuté de 30%+
+    if (csPmHistory.length >= 4 && gameTime - lastCsDropAlert >= 180) {
+      const peakCspm = Math.max(...csPmHistory.slice(0, -2))
+      if (peakCspm > 4 && currentCspm < peakCspm * 0.7) {
+        alerts.push({ text: `📉 CS/min en chute (${currentCspm.toFixed(1)} vs ${peakCspm.toFixed(1)}) — farm les vagues !`, type: 'warning' })
+        lastCsDropAlert = gameTime
       }
     }
   }
   prevCs = gameData.cs
+
+  // ─── PLAYER DEATH (respawn awareness) ────────────────────────
+
+  const deaths = gameData.kda.deaths
+  if (prevDeathCount >= 0 && deaths > prevDeathCount && gameTime - lastDeathAlert >= 30) {
+    // Respawn timer estimé : 12 + 2 * level secondes (approximation LoL)
+    const estRespawn = Math.round(12 + 2 * gameData.level)
+    if (gameTime >= 1500) {
+      alerts.push({ text: `💀 Mort en late (~${estRespawn}s respawn) — chaque mort coûte cher ici`, type: 'danger' })
+    } else if (deaths >= 3 && gameTime < 900) {
+      alerts.push({ text: `💀 ${deaths} morts en early — joue plus safe, chaque mort nourrit l'ennemi`, type: 'danger' })
+    }
+    lastDeathAlert = gameTime
+  }
+  prevDeathCount = deaths
 
   return alerts
 }

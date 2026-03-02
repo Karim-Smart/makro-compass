@@ -51,6 +51,7 @@ const CATEGORY_CD: Record<string, number> = {
   'death-analysis':  180,   // death analysis max 1 fois / 3 min
   'kp':              180,   // kill participation max 1 fois / 3 min
   'vision':          180,   // vision reminder max 1 fois / 3 min
+  'wave':            120,   // wave management max 1 fois / 2 min
 }
 
 // ─── Helpers anti-répétition ──────────────────────────────────────────────
@@ -483,6 +484,39 @@ export function generateMacroTip(
     tips.push({ text: `💰 ${goldForItem}g — assez pour un composant clé, cherche un back timing`, priority: 'low', weight: 32, category: 'back-timing' })
   } else if (goldForItem >= 3000 && completedItems <= 1 && gameTime < 1200) {
     tips.push({ text: `💰 ${goldForItem}g en poche — back MAINTENANT pour spike d'item`, priority: 'medium', weight: 35, category: 'back-timing' })
+  }
+
+  // ─── WAVE MANAGEMENT (weight 25-38) ──────────────────────────
+
+  if (matchup && gameTime >= 180) {
+    const pos = matchup.position
+    const isLaner = pos === 'TOP' || pos === 'MIDDLE' || pos === 'BOTTOM'
+
+    if (isLaner && gameTime < 840) {
+      // Early laning : wave management basique
+      const csDiff = cs - matchup.oppCs
+      if (csDiff >= 20 && matchup.levelDiff >= 0) {
+        tips.push({ text: '🌊 Avance CS — freeze devant ta tour pour zoner l\'ennemi du farm', priority: 'low', weight: 30, category: 'wave' })
+      } else if (csDiff <= -15 && matchup.levelDiff <= 0) {
+        tips.push({ text: '🌊 CS retard — laisse la vague pousser vers toi, farm sous tour', priority: 'low', weight: 28, category: 'wave' })
+      }
+    }
+
+    if (isLaner && gameTime >= 840 && gameTime < 1500) {
+      // Mid game : side lane management
+      if (killDiff >= 3) {
+        tips.push({ text: '🌊 Ahead — slow push side lane puis regroupe pour objectif', priority: 'low', weight: 32, category: 'wave' })
+      } else if (killDiff <= -3) {
+        tips.push({ text: '🌊 Behind — catch les vagues sous tour, ne farm pas dans la rivière', priority: 'medium', weight: 35, category: 'wave' })
+      }
+    }
+
+    if (pos === 'JUNGLE' && gameTime >= 600 && gameTime < 1200) {
+      // Jungler mid game : rappel de farm camps
+      if (csPerMin < 5) {
+        tips.push({ text: '🌿 Clear tes camps entre les ganks — un jungler sans farm est inutile en mid game', priority: 'low', weight: 25, category: 'wave' })
+      }
+    }
   }
 
   // ─── BOUNTY AWARENESS (weight 40-48) ─────────────────────────────
