@@ -42,6 +42,12 @@ const CATEGORY_BADGE: Record<string, { label: string; color: string }> = {
   'comp':           { label: 'MACRO',    color: '#a78bfa' },
   'ally':           { label: 'MACRO',    color: '#a78bfa' },
   'item-spike':     { label: 'ITEM',     color: '#f59e0b' },
+  'wave':           { label: 'LANE',     color: '#22d3ee' },
+  'back-timing':    { label: 'LANE',     color: '#22d3ee' },
+  'bounty':         { label: 'MACRO',    color: '#a78bfa' },
+  'death-analysis': { label: 'DÉFENSE',  color: '#ef4444' },
+  'kp':             { label: 'MACRO',    color: '#a78bfa' },
+  'vision':         { label: 'VISION',   color: '#38bdf8' },
 }
 
 export function AdviceOverlay({ advice, colors, queuePos, queueTotal, rotateKey, onMinimize, onSkip }: Props) {
@@ -50,10 +56,8 @@ export function AdviceOverlay({ advice, colors, queuePos, queueTotal, rotateKey,
 
   return (
     <div
-      className="w-[360px] overflow-hidden animate-slide-up"
+      className="w-[360px] overflow-hidden animate-slide-up clip-bevel overlay-glass"
       style={{
-        background: '#0A1628',
-        border: `1px solid rgba(200, 155, 60, 0.2)`,
         boxShadow: `0 8px 32px rgba(0,0,0,0.6), 0 0 12px rgba(200, 155, 60, 0.06)`,
       }}
     >
@@ -70,14 +74,14 @@ export function AdviceOverlay({ advice, colors, queuePos, queueTotal, rotateKey,
             {/* Badge catégorie (principal) ou style si pas de catégorie */}
             {catBadge ? (
               <span
-                className="text-[9px] font-black px-2 py-0.5 rounded tracking-widest"
+                className="text-[9px] font-black px-2 py-0.5 clip-bevel-sm tracking-widest"
                 style={{ backgroundColor: `${catBadge.color}25`, color: catBadge.color }}
               >
                 {catBadge.label}
               </span>
             ) : (
               <span
-                className="text-[9px] font-black px-2 py-0.5 rounded tracking-widest"
+                className="text-[9px] font-black px-2 py-0.5 clip-bevel-sm tracking-widest"
                 style={{ backgroundColor: `${colors.accent}25`, color: colors.accent }}
               >
                 {advice.style}

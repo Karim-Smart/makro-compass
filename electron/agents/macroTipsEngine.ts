@@ -52,6 +52,10 @@ const CATEGORY_CD: Record<string, number> = {
   'kp':              180,   // kill participation max 1 fois / 3 min
   'vision':          180,   // vision reminder max 1 fois / 3 min
   'wave':            120,   // wave management max 1 fois / 2 min
+  'herald-timer':    120,   // herald timer max 1 fois / 2 min
+  'map-trade':       120,   // map trade awareness max 1 fois / 2 min
+  'grub-timer':      180,   // void grubs reminder max 1 fois / 3 min
+  'rotation':        120,   // cross-map rotation max 1 fois / 2 min
 }
 
 // ─── Helpers anti-répétition ──────────────────────────────────────────────
@@ -325,6 +329,50 @@ export function generateMacroTip(
     const cd = Math.floor(next - gameTime)
     if (cd > 0 && cd <= 60 && next < BARON_SPAWN) {
       tips.push({ text: `🟡 Héraut respawn dans ${cd}s — utilise-le pour crash une tour`, priority: 'medium', weight: 75, category: 'herald-timer' })
+    }
+  }
+
+  // ─── MAP TRADE AWARENESS (weight 55-72) ────────────────────────────
+  // Quand un objectif est pris d'un côté, suggérer un trade de l'autre
+
+  if (gameTime >= 300 && gameTime < 1200) {
+    // Si drake vient d'être pris récemment (< 30s) et Héraut est up
+    if (lastDragonKillAt > 0 && gameTime - lastDragonKillAt < 30 && gameTime < BARON_SPAWN) {
+      const heraldUp = lastHeraldKillAt < 0 || (gameTime > lastHeraldKillAt + HERALD_RESPAWN)
+      if (heraldUp) {
+        tips.push({ text: '🔄 Ennemi a pris le Drake ? Trade Héraut de l\'autre côté !', priority: 'medium', weight: 65, category: 'map-trade' })
+      }
+    }
+    // Si herald vient d'être pris et drake est up
+    if (lastHeraldKillAt > 0 && gameTime - lastHeraldKillAt < 30) {
+      const drakeUp = lastDragonKillAt < 0 || (gameTime > lastDragonKillAt + DRAGON_RESPAWN)
+      if (drakeUp) {
+        tips.push({ text: '🔄 Héraut pris — trade Drake si possible !', priority: 'medium', weight: 65, category: 'map-trade' })
+      }
+    }
+  }
+
+  // Void Grubs (spawn à 5:00, respawn 5 min, disparaissent à 14:00)
+  if (gameTime >= 270 && gameTime < 840) {
+    const grubSpawn = 300
+    if (gameTime < grubSpawn) {
+      const cd = Math.floor(grubSpawn - gameTime)
+      if (cd <= 30) {
+        tips.push({ text: `🪲 Void Grubs spawn dans ${cd}s — prio top si ton jungler est top side`, priority: 'low', weight: 42, category: 'grub-timer' })
+      }
+    } else {
+      // Grubs existent, rappeler leur importance
+      tips.push({ text: '🪲 Void Grubs = push gratuit. Aide ton jungler à les prendre', priority: 'low', weight: 25, category: 'grub-timer' })
+    }
+  }
+
+  // Cross-map rotation awareness
+  if (gameTime >= 600 && gameTime < 1500 && killDiff >= 2) {
+    const pos = matchup?.position ?? ''
+    if (pos === 'TOP' || pos === 'MIDDLE') {
+      tips.push({ text: '🔄 Ahead — push ta lane et roam bot/drake pour convertir l\'avance', priority: 'low', weight: 30, category: 'rotation' })
+    } else if (pos === 'BOTTOM' || pos === 'UTILITY') {
+      tips.push({ text: '🔄 Ahead — push ta lane et roam mid/herald pour convertir', priority: 'low', weight: 30, category: 'rotation' })
     }
   }
 
