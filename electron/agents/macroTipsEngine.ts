@@ -30,6 +30,17 @@ let lastHeraldKillAt  = -1
 let lastTipText       = ''
 let rotationIdx       = 0
 
+// Teamfight detection — on track les snapshots de kills pour détecter les spikes
+let prevTeamKills     = 0
+let prevEnemyKills    = 0
+let prevSnapTime      = 0
+
+// Dernière teamfight détectée
+let lastFightOutcome: 'won' | 'lost' | 'even' | null = null
+let lastFightTime     = 0  // gameTime de la dernière teamfight
+let lastFightKillsWon = 0  // nombre de kills gagnés dans le fight
+let lastFightKillsLost = 0 // nombre de kills perdus dans le fight
+
 // Tracker les 5 derniers tips pour éviter la répétition
 const recentTips: string[] = []
 
@@ -56,6 +67,9 @@ const CATEGORY_CD: Record<string, number> = {
   'map-trade':       120,   // map trade awareness max 1 fois / 2 min
   'grub-timer':      180,   // void grubs reminder max 1 fois / 3 min
   'rotation':        120,   // cross-map rotation max 1 fois / 2 min
+  'teamfight':       90,    // post-teamfight tempo max 1 fois / 1.5 min
+  'number-advantage': 60,   // avantage numérique max 1 fois / 1 min
+  'fight-readiness': 120,   // préparation fight max 1 fois / 2 min
 }
 
 // ─── Helpers anti-répétition ──────────────────────────────────────────────
@@ -221,6 +235,13 @@ export function resetMacroEngine(): void {
   rotationIdx      = 0
   recentTips.length = 0
   for (const k in categoryCooldowns) delete categoryCooldowns[k]
+  prevTeamKills    = 0
+  prevEnemyKills   = 0
+  prevSnapTime     = 0
+  lastFightOutcome = null
+  lastFightTime    = 0
+  lastFightKillsWon = 0
+  lastFightKillsLost = 0
 }
 
 interface Tip {
@@ -373,6 +394,114 @@ export function generateMacroTip(
       tips.push({ text: '🔄 Ahead — push ta lane et roam bot/drake pour convertir l\'avance', priority: 'low', weight: 30, category: 'rotation' })
     } else if (pos === 'BOTTOM' || pos === 'UTILITY') {
       tips.push({ text: '🔄 Ahead — push ta lane et roam mid/herald pour convertir', priority: 'low', weight: 30, category: 'rotation' })
+    }
+  }
+
+  // ─── TEAMFIGHT DETECTION + POST-FIGHT TEMPO (weight 70-85) ────────
+  // Détecte les spikes de kills (3+ en 15s) → teamfight probable
+  // Puis conseille l'action post-fight optimale
+
+  if (gameTime > prevSnapTime + 5) {
+    const teamKillDelta = teamKills - prevTeamKills
+    const enemyKillDelta = enemyKills - prevEnemyKills
+    const timeWindow = gameTime - prevSnapTime
+
+    // 3+ kills dans une fenêtre de 20s = teamfight
+    if (timeWindow <= 20 && (teamKillDelta >= 3 || enemyKillDelta >= 3)) {
+      if (teamKillDelta > enemyKillDelta) {
+        lastFightOutcome = 'won'
+      } else if (enemyKillDelta > teamKillDelta) {
+        lastFightOutcome = 'lost'
+      } else {
+        lastFightOutcome = 'even'
+      }
+      lastFightTime = gameTime
+      lastFightKillsWon = teamKillDelta
+      lastFightKillsLost = enemyKillDelta
+    }
+
+    prevTeamKills = teamKills
+    prevEnemyKills = enemyKills
+    prevSnapTime = gameTime
+  }
+
+  // Post-teamfight tempo (fenêtre de 45s après un fight)
+  if (lastFightOutcome && gameTime - lastFightTime < 45 && gameTime - lastFightTime >= 5) {
+    const elapsed = gameTime - lastFightTime
+
+    if (lastFightOutcome === 'won') {
+      // Won teamfight → convertir
+      if (gameTime >= BARON_SPAWN && !objectives.baronActive) {
+        tips.push({ text: `🏆 Fight gagné (${lastFightKillsWon} kills) → BARON MAINTENANT ! Ne laisse pas cette fenêtre passer`, priority: 'high', weight: 85, category: 'teamfight' })
+      } else if (gameTime >= 1800 && objectives.elderActive === false) {
+        tips.push({ text: `🏆 Fight gagné → force ELDER pendant qu'ils sont morts !`, priority: 'high', weight: 85, category: 'teamfight' })
+      } else if (towers.enemyDestroyed >= 6) {
+        tips.push({ text: `🏆 Fight gagné → push pour l'inhib/nexus ! Chaque seconde compte`, priority: 'high', weight: 82, category: 'teamfight' })
+      } else {
+        tips.push({ text: `🏆 Fight gagné (${lastFightKillsWon} kills) → pousse une tour ou prends un objectif !`, priority: 'high', weight: 78, category: 'teamfight' })
+      }
+    } else if (lastFightOutcome === 'lost') {
+      // Lost teamfight → limiter les pertes
+      if (elapsed < 15) {
+        tips.push({ text: `💀 Fight perdu (${lastFightKillsLost} morts) → RECULE ! Ne donne pas plus de kills gratuits`, priority: 'high', weight: 80, category: 'teamfight' })
+      } else {
+        tips.push({ text: `💀 Fight perdu — farm safe, défends les tours, attends les respawns`, priority: 'medium', weight: 70, category: 'teamfight' })
+      }
+    } else {
+      // Even fight
+      tips.push({ text: `⚖️ Fight serré — reset, heal, et prépare le prochain objectif`, priority: 'medium', weight: 65, category: 'teamfight' })
+    }
+  }
+
+  // ─── NUMBER ADVANTAGE (weight 72-82) ──────────────────────────────
+  // Si l'adversaire de lane est mort et qu'on est en avantage numérique
+
+  if (matchup && matchup.isDead && matchup.respawnTimer > 15 && gameTime >= 600) {
+    const respawnSec = Math.round(matchup.respawnTimer)
+
+    if (gameTime >= BARON_SPAWN && !objectives.baronActive && respawnSec > 25) {
+      tips.push({ text: `📢 ${matchup.champion} mort (${respawnSec}s) → appelle Baron en 5v4 !`, priority: 'high', weight: 82, category: 'number-advantage' })
+    } else if (lastDragonKillAt < 0 || gameTime > lastDragonKillAt + DRAGON_RESPAWN) {
+      tips.push({ text: `📢 ${matchup.champion} mort (${respawnSec}s) → force Drake en supériorité numérique`, priority: 'high', weight: 78, category: 'number-advantage' })
+    } else {
+      tips.push({ text: `📢 ${matchup.champion} mort (${respawnSec}s) → push tour ou invade jungle`, priority: 'medium', weight: 72, category: 'number-advantage' })
+    }
+  }
+
+  // ─── FIGHT READINESS CHECK (weight 40-55) ─────────────────────────
+  // Avant les objectifs majeurs, rappeler de vérifier la readiness
+
+  if (gameTime >= 1080) {
+    // Baron/Elder coming up — check readiness
+    const baronUpSoon = (gameTime >= 1080 && gameTime < BARON_SPAWN && BARON_SPAWN - gameTime < 120)
+      || (lastBaronKillAt > 0 && gameTime > lastBaronKillAt + BARON_RESPAWN - 60 && gameTime < lastBaronKillAt + BARON_RESPAWN)
+
+    if (baronUpSoon) {
+      tips.push({ text: '⚡ Baron bientôt — vérifie : ults up ? Flash up ? Poke avant d\'engager !', priority: 'medium', weight: 48, category: 'fight-readiness' })
+    }
+
+    // Late game general fight prep
+    if (gameTime >= 1500 && Math.abs(goldDiff) < 3000) {
+      tips.push({ text: '⚡ Late game serré — ne fight que si ults + flash up et vision du pit', priority: 'medium', weight: 45, category: 'fight-readiness' })
+    }
+  }
+
+  // ─── SIDE LANE PRESSURE TIMING (weight 35-52) ────────────────────
+  // Quand split vs group
+
+  if (gameTime >= 1200 && matchup) {
+    const pos = matchup.position
+    const isLaner = pos === 'TOP' || pos === 'MIDDLE' || pos === 'BOTTOM'
+
+    if (objectives.baronActive && isLaner) {
+      // Baron buff actif → split push obligatoire
+      tips.push({ text: '🏰 BARON BUFF → envoie 1 top, 1 bot, 3 mid. Push 2 lanes simultanément', priority: 'high', weight: 52, category: 'rotation' })
+    } else if (isLaner && towerDiff >= 2 && gameTime < 1800) {
+      // Ahead en tours → split pour étouffer
+      tips.push({ text: '🌊 Ahead — split side lane pour créer de la pression, regroupe quand objectif spawn', priority: 'low', weight: 38, category: 'rotation' })
+    } else if (isLaner && gameTime >= 1500 && killDiff <= -3) {
+      // Behind en late → group only
+      tips.push({ text: '🛡️ Behind en late — NE SPLITTE PAS seul. Reste groupé, un pick = défaite', priority: 'medium', weight: 42, category: 'rotation' })
     }
   }
 

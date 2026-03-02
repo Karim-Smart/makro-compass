@@ -48,6 +48,12 @@ const CATEGORY_BADGE: Record<string, { label: string; color: string }> = {
   'death-analysis': { label: 'DÉFENSE',  color: '#ef4444' },
   'kp':             { label: 'MACRO',    color: '#a78bfa' },
   'vision':         { label: 'VISION',   color: '#38bdf8' },
+  'map-trade':      { label: 'MACRO',    color: '#a78bfa' },
+  'grub-timer':     { label: 'OBJECTIF', color: '#f97316' },
+  'rotation':       { label: 'MACRO',    color: '#a78bfa' },
+  'teamfight':      { label: 'FIGHT',    color: '#ef4444' },
+  'number-advantage': { label: 'FIGHT',  color: '#ef4444' },
+  'fight-readiness': { label: 'FIGHT',   color: '#ef4444' },
 }
 
 export function AdviceOverlay({ advice, colors, queuePos, queueTotal, rotateKey, onMinimize, onSkip }: Props) {
