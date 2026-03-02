@@ -19,6 +19,11 @@ let prevEnemyKills     = -1
 let prevDragonStacks   = -1
 let prevBaronActive    = false
 let prevGold           = 0
+let prevGoldDiff       = 0
+let goldDiffTrend      = 0    // positif = on gagne du terrain, négatif = on perd
+let prevCs             = 0
+let prevGameTime       = 0
+let lastGoldTrendAlert = 0    // gameTime du dernier rappel tendance
 
 // ─── API publique ────────────────────────────────────────────────────────────
 
@@ -34,6 +39,11 @@ export function resetAlertEngine(): void {
   prevDragonStacks = -1
   prevBaronActive  = false
   prevGold         = 0
+  prevGoldDiff     = 0
+  goldDiffTrend    = 0
+  prevCs           = 0
+  prevGameTime     = 0
+  lastGoldTrendAlert = 0
 }
 
 /**
@@ -170,6 +180,54 @@ export function detectAlerts(gameData: GameData): GameAlert[] {
     }
   }
   prevGold = currentGold
+
+  // ─── GOLD VELOCITY (tendance du gold diff) ─────────────────────
+
+  const currentGoldDiff = gameData.teamGold - gameData.enemyGold
+  if (prevGameTime > 0 && gameTime > prevGameTime) {
+    const deltaGoldDiff = currentGoldDiff - prevGoldDiff
+    // Moyenne glissante pour lisser
+    goldDiffTrend = goldDiffTrend * 0.6 + deltaGoldDiff * 0.4
+
+    if (gameTime >= 600 && gameTime - lastGoldTrendAlert >= 120) {
+      // On est derrière mais on rattrape fortement
+      if (currentGoldDiff < -1000 && goldDiffTrend > 500) {
+        alerts.push({ text: `📈 On rattrape le retard gold — continue le tempo !`, type: 'success' })
+        lastGoldTrendAlert = gameTime
+      }
+      // On est ahead mais on perd du terrain rapidement
+      if (currentGoldDiff > 2000 && goldDiffTrend < -800) {
+        alerts.push({ text: `📉 L'avance gold diminue — convertis en objectif MAINTENANT`, type: 'warning' })
+        lastGoldTrendAlert = gameTime
+      }
+    }
+  }
+  prevGoldDiff = currentGoldDiff
+  prevGameTime = gameTime
+
+  // ─── MULTI-OBJECTIF (baron + drake simultanés) ──────────────────
+
+  if (gameTime >= 1200) {
+    const { baronActive, elderActive } = gameData.objectives
+    if (baronActive && elderActive) {
+      alerts.push({ text: `🏆 BARON + ELDER actifs — siège leur base, fin de game !`, type: 'success' })
+    }
+  }
+
+  // ─── CS SPIKE (excellente phase de CS) ──────────────────────────
+
+  if (prevCs > 0 && gameData.cs > prevCs) {
+    const deltaCs = gameData.cs - prevCs
+    const deltaTime = gameTime - (prevGameTime > 0 ? prevGameTime : gameTime)
+    if (deltaTime > 0 && deltaTime < 15) {
+      const instantCspm = (deltaCs / deltaTime) * 60
+      // Si on a un CS/min instantané > 10, c'est une excellente séquence
+      if (instantCspm > 10 && gameData.cs > 50) {
+        // Pas d'alerte, trop spammant — on laisse macroTips gérer
+      }
+    }
+  }
+  prevCs = gameData.cs
 
   return alerts
 }

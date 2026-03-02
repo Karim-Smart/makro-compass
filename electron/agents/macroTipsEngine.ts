@@ -551,6 +551,97 @@ export function generateMacroTip(
     }
   }
 
+  // ─── TEMPO AWARENESS (weight 42-55) ─────────────────────────────
+  // Détection de stagnation ou d'accélération de jeu
+
+  if (gameTime >= 900) {
+    const goldPerMin = (teamGold > 0 && gameTime > 0) ? (teamGold / (gameTime / 60)) : 0
+    const enemyGoldPerMin = (enemyGold > 0 && gameTime > 0) ? (enemyGold / (gameTime / 60)) : 0
+
+    // On a du gold lead mais l'ennemi farm mieux → on stagne
+    if (goldDiff > 2000 && enemyGoldPerMin > goldPerMin * 0.95 && teamKills > enemyKills + 2) {
+      tips.push({
+        text: `⏳ Tu as +${(goldDiff / 1000).toFixed(1)}k mais l'ennemi rattrape — force un objectif MAINTENANT`,
+        priority: 'medium',
+        weight: 50,
+        category: 'gold-diff',
+      })
+    }
+
+    // Late game + même gold = coin flip imminent
+    if (gameTime >= 1500 && Math.abs(goldDiff) < 2000) {
+      tips.push({
+        text: `⚖️ Gold similaire en late — le prochain teamfight décide. Position + ults up avant de fight`,
+        priority: 'medium',
+        weight: 48,
+        category: 'gold-diff',
+      })
+    }
+  }
+
+  // ─── TOWER MAP CONTROL (weight 45-58) ──────────────────────────
+
+  if (gameTime >= 840) {
+    const towerAdvance = towers.enemyDestroyed - towers.allyDestroyed
+    // Très gros retard de tours mais pas de kills retard → split problem
+    if (towerAdvance <= -2 && killDiff >= 0) {
+      tips.push({
+        text: `🏰 ${towers.allyDestroyed} tours perdues malgré les kills — convertis les kills en push, pas juste des fights`,
+        priority: 'medium',
+        weight: 52,
+        category: 'tower-state',
+      })
+    }
+    // Avantage de tours + Baron upcoming → setup pour end game
+    if (towerAdvance >= 3 && gameTime >= 1200 && !objectives.baronActive) {
+      tips.push({
+        text: `🏆 +${towers.enemyDestroyed} tours + Baron dispo — start Nash pour forcer le end`,
+        priority: 'high',
+        weight: 58,
+        category: 'structural',
+      })
+    }
+    // Inhibitor pressure (approx: si 7+ tours ennemies détruites)
+    if (towers.enemyDestroyed >= 7) {
+      tips.push({
+        text: `🏰 Inhib exposé — un seul bon fight et c'est fini. Force Baron ou Elder pour closer`,
+        priority: 'high',
+        weight: 62,
+        category: 'structural',
+      })
+    }
+  }
+
+  // ─── ENEMY POWER SPIKE ITEMIZATION (weight 30-45) ────────────
+
+  if (enemies.length >= 3) {
+    let assCount = 0
+    let tankCount = 0
+    for (const enemy of enemies) {
+      const info = getChampion(enemy)
+      if (info?.class === 'assassin') assCount++
+      if (info?.class === 'tank' || info?.class === 'engage') tankCount++
+    }
+    // Face à 2+ assassins en mid/late game
+    if (assCount >= 2 && gameTime >= 900) {
+      tips.push({
+        text: `⚔️ ${assCount} assassins ennemis — joue groupé, JAMAIS isolé en side lane`,
+        priority: 'medium',
+        weight: 42,
+        category: 'comp',
+      })
+    }
+    // Face à 3+ tanks/engage
+    if (tankCount >= 3 && gameTime >= 900) {
+      tips.push({
+        text: `🛡️ Comp tanky/engage — évite les long fights, kite et poke avant d'engager`,
+        priority: 'medium',
+        weight: 40,
+        category: 'comp',
+      })
+    }
+  }
+
   // ─── GENERAL PHASE TIPS (weight 10, rotation) ───────────────────
 
   const phaseTips = getPhaseGeneralTips(gameData, style)
