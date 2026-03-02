@@ -41,6 +41,11 @@ let lastFightTime     = 0  // gameTime de la dernière teamfight
 let lastFightKillsWon = 0  // nombre de kills gagnés dans le fight
 let lastFightKillsLost = 0 // nombre de kills perdus dans le fight
 
+// Gold swing tracker — snapshots du gold diff pour détecter les retournements
+let prevGoldDiff       = 0
+let prevGoldSnapTime   = 0
+let goldTrend: 'rising' | 'falling' | 'stable' = 'stable'
+
 // Tracker les 5 derniers tips pour éviter la répétition
 const recentTips: string[] = []
 
@@ -70,6 +75,7 @@ const CATEGORY_CD: Record<string, number> = {
   'teamfight':       90,    // post-teamfight tempo max 1 fois / 1.5 min
   'number-advantage': 60,   // avantage numérique max 1 fois / 1 min
   'fight-readiness': 120,   // préparation fight max 1 fois / 2 min
+  'gold-swing':      180,   // gold swing detection max 1 fois / 3 min
 }
 
 // ─── Helpers anti-répétition ──────────────────────────────────────────────
@@ -242,6 +248,9 @@ export function resetMacroEngine(): void {
   lastFightTime    = 0
   lastFightKillsWon = 0
   lastFightKillsLost = 0
+  prevGoldDiff       = 0
+  prevGoldSnapTime   = 0
+  goldTrend          = 'stable'
 }
 
 interface Tip {
@@ -576,6 +585,52 @@ export function generateMacroTip(
   } else if (goldDiff < -3000) {
     const kStr = (Math.abs(goldDiff) / 1000).toFixed(1)
     tips.push({ text: `💸 Retard or -${kStr}k — joue patient, cherche les picks`, priority: 'medium', weight: 52, category: 'gold-diff' })
+  }
+
+  // ─── GOLD SWING DETECTION (weight 58-72) ─────────────────────────
+  // Détecte les retournements de gold (swing de 2k+ en 60s)
+
+  if (gameTime > prevGoldSnapTime + 30 && teamGold > 0) {
+    const swingDelta = goldDiff - prevGoldDiff
+    const timeDelta  = gameTime - prevGoldSnapTime
+
+    if (timeDelta > 0 && timeDelta <= 90) {
+      // Détection du swing
+      if (swingDelta > 2000) {
+        goldTrend = 'rising'
+        if (prevGoldDiff <= 0 && goldDiff > 500) {
+          // Retournement : on était behind, maintenant ahead
+          tips.push({
+            text: `📈 RETOURNEMENT ! +${(swingDelta / 1000).toFixed(1)}k gold gagné — convertis en objectifs MAINTENANT`,
+            priority: 'high', weight: 72, category: 'gold-swing',
+          })
+        } else {
+          tips.push({
+            text: `📈 Gold swing +${(swingDelta / 1000).toFixed(1)}k — momentum en ta faveur, force la pression`,
+            priority: 'medium', weight: 58, category: 'gold-swing',
+          })
+        }
+      } else if (swingDelta < -2000) {
+        goldTrend = 'falling'
+        if (prevGoldDiff >= 0 && goldDiff < -500) {
+          // Retournement négatif : on était ahead, maintenant behind
+          tips.push({
+            text: `📉 ATTENTION ! -${(Math.abs(swingDelta) / 1000).toFixed(1)}k gold perdu — stop les plays risqués, farm safe`,
+            priority: 'high', weight: 72, category: 'gold-swing',
+          })
+        } else {
+          tips.push({
+            text: `📉 Gold swing -${(Math.abs(swingDelta) / 1000).toFixed(1)}k — joue prudemment, consolide ta position`,
+            priority: 'medium', weight: 58, category: 'gold-swing',
+          })
+        }
+      } else {
+        goldTrend = 'stable'
+      }
+    }
+
+    prevGoldDiff     = goldDiff
+    prevGoldSnapTime = gameTime
   }
 
   // ─── ENEMY COMPOSITION (weight 50) ────────────────────────────────

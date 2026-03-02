@@ -190,6 +190,27 @@ function parseGameData(raw: RiotApiResponse): GameData {
     }
   }
 
+  // ─── Estimation du gold par équipe ──────────────────────────────
+  // L'API Live Client ne fournit pas le gold total — on l'estime à partir de :
+  //   kills × 300 + assists × 150 + CS × 20 + gold de base passif (≈2/s après 2min)
+  // Ce n'est pas exact mais permet des comparaisons relatives fiables.
+  const passiveGoldPerPlayer = Math.max(0, gameTime - 120) * 2  // ~2g/s après 2min
+  let estimatedTeamGold  = 0
+  let estimatedEnemyGold = 0
+
+  for (const p of raw.allPlayers ?? []) {
+    const pKills   = p.scores?.kills      ?? 0
+    const pAssists = p.scores?.assists    ?? 0
+    const pCs      = p.scores?.creepScore ?? 0
+    const estimated = pKills * 300 + pAssists * 150 + pCs * 20 + passiveGoldPerPlayer
+
+    if (p.team === myTeam) {
+      estimatedTeamGold += estimated
+    } else {
+      estimatedEnemyGold += estimated
+    }
+  }
+
   return {
     isInGame: true,
     champion: championName,
@@ -198,8 +219,8 @@ function parseGameData(raw: RiotApiResponse): GameData {
     cs,
     gold:     player.currentGold ?? 0,
     gameTime,
-    teamGold:   0,
-    enemyGold:  0,
+    teamGold:   estimatedTeamGold,
+    enemyGold:  estimatedEnemyGold,
     objectives: {
       dragonStacks: Math.min(allyDragons, 4),
       enemyDragonStacks: Math.min(enemyDragons, 4),

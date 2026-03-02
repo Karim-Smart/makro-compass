@@ -54,6 +54,7 @@ const CATEGORY_BADGE: Record<string, { label: string; color: string }> = {
   'teamfight':      { label: 'FIGHT',    color: '#ef4444' },
   'number-advantage': { label: 'FIGHT',  color: '#ef4444' },
   'fight-readiness': { label: 'FIGHT',   color: '#ef4444' },
+  'gold-swing':      { label: 'GOLD',    color: '#facc15' },
 }
 
 export function AdviceOverlay({ advice, colors, queuePos, queueTotal, rotateKey, onMinimize, onSkip }: Props) {

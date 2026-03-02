@@ -8,7 +8,7 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { COACHING_STYLES, TIER_LABELS } from '../../../shared/constants'
 import { IPC } from '../../../shared/ipc-channels'
 import { getChampionIconUrl } from '../../../shared/champion-images'
-import { computeStreak, computeRecentForm } from '../../../shared/game-analysis'
+import { computeStreak, computeRecentForm, computeInsights, computeGameGrade } from '../../../shared/game-analysis'
 import type { RankedGame } from '../../../shared/types'
 
 function formatGameTime(s: number): string {
@@ -319,6 +319,120 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
+          </div>
+        )
+      })()}
+
+      {/* ─── DERNIÈRES PARTIES + INSIGHTS (hors partie, 1+ games) ─── */}
+      {!isInGame && todayGames.length >= 1 && (() => {
+        const last3 = todayGames.slice(0, 3)
+        const insights = computeInsights(todayGames)
+        const topInsights = insights.slice(0, 2)
+
+        const INSIGHT_META = {
+          warning: { color: '#ef4444', bg: '#ef444412', border: '#ef444425' },
+          success: { color: '#22c55e', bg: '#22c55e12', border: '#22c55e25' },
+          tip:     { color: '#f59e0b', bg: '#f59e0b12', border: '#f59e0b25' },
+        } as const
+
+        return (
+          <div className="flex gap-2 flex-shrink-0">
+            {/* Mini-recap des 3 dernières parties */}
+            <div
+              className="clip-bevel-lg p-3 flex-1 min-w-0"
+              style={{
+                background: `linear-gradient(160deg, ${c.bg} 0%, ${c.border}30 100%)`,
+                border: `1px solid ${c.border}`,
+              }}
+            >
+              <div className="text-[8px] font-black uppercase tracking-[0.2em] mb-2" style={{ color: c.text, opacity: 0.3 }}>
+                Dernières parties
+              </div>
+              <div className="flex flex-col gap-1.5">
+                {last3.map((game, idx) => {
+                  const grade = computeGameGrade(game)
+                  const kda = game.deaths === 0
+                    ? (game.kills + game.assists).toFixed(0) + ' Perfect'
+                    : ((game.kills + game.assists) / game.deaths).toFixed(1)
+                  const csMin = game.gameTime > 60
+                    ? (game.cs / (game.gameTime / 60)).toFixed(1)
+                    : '0'
+                  return (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 py-1 px-1.5 clip-bevel-sm"
+                      style={{
+                        background: game.result === 'win' ? '#22c55e08' : '#ef444408',
+                        border: `1px solid ${game.result === 'win' ? '#22c55e18' : '#ef444418'}`,
+                      }}
+                    >
+                      {/* Champion icon */}
+                      <div className="w-6 h-6 clip-hex overflow-hidden flex-shrink-0">
+                        <img
+                          src={getChampionIconUrl(game.champion)}
+                          alt={game.champion}
+                          className="w-full h-full object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                        />
+                      </div>
+                      {/* W/L */}
+                      <span
+                        className="text-[9px] font-black w-3 flex-shrink-0"
+                        style={{ color: game.result === 'win' ? '#22c55e' : '#ef4444' }}
+                      >
+                        {game.result === 'win' ? 'W' : 'L'}
+                      </span>
+                      {/* Grade */}
+                      <span
+                        className="text-[9px] font-black w-5 flex-shrink-0 text-center"
+                        style={{ color: grade.color }}
+                      >
+                        {grade.grade}
+                      </span>
+                      {/* KDA */}
+                      <span className="text-[9px] font-mono flex-shrink-0" style={{ color: c.text, opacity: 0.7 }}>
+                        {game.kills}/{game.deaths}/{game.assists}
+                      </span>
+                      {/* CS/min */}
+                      <span className="text-[8px] font-mono ml-auto flex-shrink-0" style={{ color: c.text, opacity: 0.35 }}>
+                        {csMin} cs/m
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Insights de session */}
+            {topInsights.length > 0 && (
+              <div className="flex flex-col gap-2 w-[200px] flex-shrink-0">
+                {topInsights.map((insight, idx) => {
+                  const meta = INSIGHT_META[insight.type]
+                  return (
+                    <div
+                      key={idx}
+                      className="clip-bevel p-2.5 flex-1"
+                      style={{
+                        background: meta.bg,
+                        border: `1px solid ${meta.border}`,
+                      }}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-xs">{insight.icon}</span>
+                        <span className="text-[9px] font-bold truncate" style={{ color: meta.color }}>
+                          {insight.title}
+                        </span>
+                      </div>
+                      <p className="text-[8px] leading-snug" style={{ color: c.text, opacity: 0.55 }}>
+                        {insight.description.length > 80
+                          ? insight.description.slice(0, 77) + '…'
+                          : insight.description}
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )
       })()}
