@@ -491,11 +491,12 @@ async function poll(): Promise<void> {
     if (wasInGame && consecutiveErrors >= ERRORS_BEFORE_END) {
       // Sauvegarder la partie ranked si applicable
       const queueType = getLastQueueType()
-      if (queueType && lastGameData) {
-        const result = lastGameResult ?? (lastGameData.teamKills > lastGameData.enemyKills ? 'win' : 'loss')
-        saveRankedGame(lastGameData, queueType, result)
-        console.log(`[RiotAgent] Partie classée sauvegardée — ${lastGameData.champion} ${result} (${queueType})`)
+      if (queueType && lastGameData && lastGameResult) {
+        saveRankedGame(lastGameData, queueType, lastGameResult)
+        console.log(`[RiotAgent] Partie classée sauvegardée — ${lastGameData.champion} ${lastGameResult} (${queueType})`)
         broadcastToWindows(IPC.RANKED_IMPORT_DONE, { count: 1 })
+      } else if (queueType && lastGameData && !lastGameResult) {
+        console.warn('[RiotAgent] Résultat de partie inconnu (déconnexion ?) — sauvegarde ignorée, le LCU importera la partie')
       }
 
       wasInGame = false

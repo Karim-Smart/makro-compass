@@ -531,7 +531,7 @@ async function poll(): Promise<void> {
     broadcastToWindows(IPC.DRAFT_UPDATE, draftState)
 
     // Auto-import runes au lock-in (phase FINALIZATION)
-    if (draftState.phase === 'FINALIZATION') {
+    if (draftState.phase === 'FINALIZATION' && draftState.myTeam?.length) {
       const localPick = draftState.myTeam.find(p => p.completed && p.championName)
       if (localPick && localPick.championName !== lastAutoImportChampion) {
         lastAutoImportChampion = localPick.championName

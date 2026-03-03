@@ -8,9 +8,10 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "build:win": "npm run build && electron-builder --win",
+    "build:win": "npm run build && ow-electron-builder --win --publish never",
     "build:mac": "npm run build && electron-builder --mac",
     "build:linux": "npm run build && electron-builder --linux",
+    "start:ow": "ow-electron .",
     "gen:tray-icon": "node scripts/generate-tray-icon.cjs",
     "gen:app-icon": "node scripts/generate-app-icon.cjs",
     "rebuild:native": "HOME=~/.electron-gyp npx node-gyp rebuild --target=27.3.11 --arch=x64 --dist-url=https://electronjs.org/headers --directory=node_modules/better-sqlite3"
@@ -25,6 +26,9 @@
   "author": "Karim",
   "license": "MIT",
   "devDependencies": {
+    "@overwolf/ow-electron": "^39.6.0",
+    "@overwolf/ow-electron-builder": "^26.0.12",
+    "@overwolf/ow-electron-packages-types": "^1.0.3",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^20.17.10",
     "@types/react": "^18.3.12",
@@ -85,6 +89,11 @@
     "files": [
       "out/**/*",
       "resources/**/*"
+    ]
+  },
+  "overwolf": {
+    "packages": [
+      "overlay"
     ]
   }
 }

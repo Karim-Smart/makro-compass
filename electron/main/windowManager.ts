@@ -3,10 +3,11 @@ import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import type { OverlayPanels, SubscriptionTier } from '../../shared/types'
 import { canAccess } from '../../shared/feature-gates'
+import type { IOverwolfOverlayApi, OverlayBrowserWindow, PassthroughType } from '@overwolf/ow-electron-packages-types'
 
 let mainWindow: BrowserWindow | null = null
 
-// 7 fenêtres overlay indépendantes
+// 7 fenêtres overlay — stockent le BrowserWindow sous-jacent (compatible ow-electron et standard)
 let statsWindow: BrowserWindow | null = null
 let timersWindow: BrowserWindow | null = null
 let adviceWindow: BrowserWindow | null = null
@@ -14,6 +15,9 @@ let styleWindow: BrowserWindow | null = null
 let buildWindow: BrowserWindow | null = null
 let winconditionWindow: BrowserWindow | null = null
 let scoreboardWindow: BrowserWindow | null = null
+
+// Références OverlayBrowserWindow pour le contrôle passthrough (ow-electron uniquement)
+const overlayBrowserWindows = new Map<string, OverlayBrowserWindow>()
 
 // Préférences de visibilité par panneau (par défaut tout activé sauf wincondition)
 let panelSettings: OverlayPanels = {
@@ -32,9 +36,27 @@ let overlayActive = false
 // Tier actuel pour le gating overlay
 let currentTier: SubscriptionTier = 'free'
 
+// API overlay Overwolf (null si mode standard Electron)
+let overlayApi: IOverwolfOverlayApi | null = null
+
 /** Met à jour le tier pour le gating overlay. */
 export function setOverlayTier(tier: SubscriptionTier): void {
   currentTier = tier
+}
+
+/** Stocke la référence à l'API overlay Overwolf. Active le mode ow-electron. */
+export function setOverlayApi(api: IOverwolfOverlayApi): void {
+  overlayApi = api
+}
+
+/** Retourne l'API overlay Overwolf (null si mode standard). */
+export function getOverlayApi(): IOverwolfOverlayApi | null {
+  return overlayApi
+}
+
+/** Retourne true si ow-electron overlay est actif. */
+export function isOverwolfMode(): boolean {
+  return overlayApi !== null
 }
 
 const PRELOAD_MAIN = join(__dirname, '../preload/index.cjs')
@@ -99,31 +121,68 @@ interface OverlaySpec {
   y: number
 }
 
-function createPanelWindow(spec: OverlaySpec): BrowserWindow {
-  const win = new BrowserWindow({
-    width: spec.width,
-    height: spec.height,
-    x: spec.x,
-    y: spec.y,
-    frame: false,
-    transparent: true,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    resizable: false,
-    movable: false,
-    focusable: false,
-    hasShadow: false,
-    webPreferences: {
-      preload: PRELOAD_OVERLAY,
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false
-    }
-  })
+/**
+ * Crée une fenêtre overlay individuelle.
+ * - Mode ow-electron : utilise overlayApi.createWindow() pour injection DirectX (fullscreen support)
+ * - Mode standard : utilise BrowserWindow avec alwaysOnTop + transparent (borderless windowed uniquement)
+ */
+async function createPanelWindow(spec: OverlaySpec): Promise<BrowserWindow> {
+  let win: BrowserWindow
 
-  win.setAlwaysOnTop(true, 'screen-saver')
-  // Laisser passer les clics au jeu par défaut
-  win.setIgnoreMouseEvents(true, { forward: true })
+  if (overlayApi) {
+    // ── Mode ow-electron : OverlayBrowserWindow avec injection DirectX ──
+    const owWin = await overlayApi.createWindow({
+      name: spec.panel,
+      width: spec.width,
+      height: spec.height,
+      x: spec.x,
+      y: spec.y,
+      frame: false,
+      transparent: true,
+      skipTaskbar: true,
+      resizable: false,
+      show: false,
+      // Click-through : les clics passent au jeu par défaut
+      passthrough: 1 as PassthroughType, // PassthroughType.PassThrough
+      webPreferences: {
+        preload: PRELOAD_OVERLAY,
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: false,
+      },
+    })
+
+    // Stocker la ref OverlayBrowserWindow pour le contrôle passthrough
+    overlayBrowserWindows.set(spec.panel, owWin)
+    win = owWin.window
+    win.on('closed', () => { overlayBrowserWindows.delete(spec.panel) })
+  } else {
+    // ── Mode standard Electron (dev / WSL2) ──
+    win = new BrowserWindow({
+      width: spec.width,
+      height: spec.height,
+      x: spec.x,
+      y: spec.y,
+      frame: false,
+      transparent: true,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      resizable: false,
+      movable: false,
+      focusable: false,
+      hasShadow: false,
+      webPreferences: {
+        preload: PRELOAD_OVERLAY,
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: false
+      }
+    })
+
+    win.setAlwaysOnTop(true, 'screen-saver')
+    win.setIgnoreMouseEvents(true, { forward: true })
+  }
+
   win.hide()
 
   const panelUrl = `?panel=${spec.panel}`
@@ -143,11 +202,11 @@ function createPanelWindow(spec: OverlaySpec): BrowserWindow {
   return win
 }
 
-export function createOverlayWindows(): BrowserWindow[] {
+export async function createOverlayWindows(): Promise<BrowserWindow[]> {
   const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize
 
   // Stats — haut gauche (KDA + CS + Gold + timer + matchup + vision)
-  statsWindow = createPanelWindow({
+  statsWindow = await createPanelWindow({
     panel: 'stats',
     width: 320,
     height: 110,
@@ -157,7 +216,7 @@ export function createOverlayWindows(): BrowserWindow[] {
   statsWindow.on('closed', () => { statsWindow = null })
 
   // Timers — bas gauche
-  timersWindow = createPanelWindow({
+  timersWindow = await createPanelWindow({
     panel: 'timers',
     width: 220,
     height: 180,
@@ -167,7 +226,7 @@ export function createOverlayWindows(): BrowserWindow[] {
   timersWindow.on('closed', () => { timersWindow = null })
 
   // Advice — haut droite (élargi pour meilleur texte)
-  adviceWindow = createPanelWindow({
+  adviceWindow = await createPanelWindow({
     panel: 'advice',
     width: 380,
     height: 170,
@@ -176,8 +235,8 @@ export function createOverlayWindows(): BrowserWindow[] {
   })
   adviceWindow.on('closed', () => { adviceWindow = null })
 
-  // Style switcher — droite, centré verticalement (un peu plus large pour les icônes SVG)
-  styleWindow = createPanelWindow({
+  // Style switcher — droite, centré verticalement
+  styleWindow = await createPanelWindow({
     panel: 'style',
     width: 72,
     height: 200,
@@ -187,7 +246,7 @@ export function createOverlayWindows(): BrowserWindow[] {
   styleWindow.on('closed', () => { styleWindow = null })
 
   // Build — droite, colonne compacte verticale
-  buildWindow = createPanelWindow({
+  buildWindow = await createPanelWindow({
     panel: 'build',
     width: 64,
     height: 420,
@@ -197,7 +256,7 @@ export function createOverlayWindows(): BrowserWindow[] {
   buildWindow.on('closed', () => { buildWindow = null })
 
   // Win Condition — haut centre (Elite uniquement)
-  winconditionWindow = createPanelWindow({
+  winconditionWindow = await createPanelWindow({
     panel: 'wincondition',
     width: 280,
     height: 80,
@@ -207,7 +266,7 @@ export function createOverlayWindows(): BrowserWindow[] {
   winconditionWindow.on('closed', () => { winconditionWindow = null })
 
   // Scoreboard — bas centre (5v5 gold diff style Blitz)
-  scoreboardWindow = createPanelWindow({
+  scoreboardWindow = await createPanelWindow({
     panel: 'scoreboard',
     width: 420,
     height: 220,
@@ -252,17 +311,36 @@ function getPanelWindow(panel: keyof OverlayPanels): BrowserWindow | null {
 export function setPanelSettings(panels: Partial<OverlayPanels>): void {
   panelSettings = { ...panelSettings, ...panels }
   if (overlayActive) {
-    // Appliquer en temps réel : show/hide chaque panneau
     for (const key of Object.keys(panelSettings) as (keyof OverlayPanels)[]) {
       const win = getPanelWindow(key)
       if (!win || win.isDestroyed()) continue
       if (panelSettings[key]) {
-        win.setAlwaysOnTop(true, 'screen-saver')
-        win.setIgnoreMouseEvents(true, { forward: true })
+        if (!overlayApi) {
+          // Mode standard : forcer alwaysOnTop + passthrough
+          win.setAlwaysOnTop(true, 'screen-saver')
+          win.setIgnoreMouseEvents(true, { forward: true })
+        }
         win.showInactive()
       } else {
         win.hide()
       }
+    }
+  }
+}
+
+/**
+ * Bascule le passthrough des fenêtres overlay (click-through ↔ interactif).
+ * - Mode ow-electron : modifie overlayOptions.passthrough
+ * - Mode standard : utilise setIgnoreMouseEvents
+ */
+export function setOverlayPassthrough(ignore: boolean): void {
+  if (overlayApi) {
+    for (const owWin of overlayBrowserWindows.values()) {
+      owWin.overlayOptions.passthrough = (ignore ? 1 : 0) as PassthroughType
+    }
+  } else {
+    for (const win of getOverlayWindows()) {
+      win.setIgnoreMouseEvents(ignore, { forward: true })
     }
   }
 }
@@ -289,15 +367,15 @@ export function showOverlay(): void {
     }
 
     if (panelSettings[key]) {
-      // Forcer alwaysOnTop + ignore mouse events à chaque show
-      // (le jeu peut réclamer le focus entre les shows)
-      win.setAlwaysOnTop(true, 'screen-saver')
-      win.setIgnoreMouseEvents(true, { forward: true })
-      win.showInactive()  // showInactive = montre sans voler le focus au jeu
+      if (!overlayApi) {
+        // Mode standard : forcer alwaysOnTop + ignore mouse events à chaque show
+        win.setAlwaysOnTop(true, 'screen-saver')
+        win.setIgnoreMouseEvents(true, { forward: true })
+      }
+      win.showInactive()
     }
-    // les panneaux désactivés restent cachés
   }
-  console.log('[WindowManager] Overlays affichés (partie détectée)')
+  console.log(`[WindowManager] Overlays affichés (mode: ${overlayApi ? 'ow-electron' : 'standard'})`)
 }
 
 export function hideOverlay(): void {

@@ -29,8 +29,8 @@ jobs:
       - name: Build (Vite + Electron)
         run: npm run build
 
-      - name: Package Windows (installer + portable)
-        run: npx electron-builder --win --x64 --publish never
+      - name: Package Windows (ow-electron-builder)
+        run: npx ow-electron-builder --win --x64 --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false   # pas de signature de code
 
@@ -38,6 +38,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: maKro-Compass-Setup
+          path: dist/*.exe
+          if-no-files-found: warn
+
+      - name: Upload portable (.exe)
+        uses: actions/upload-artifact@v4
+        with:
+          name: maKro-Compass-Portable
           path: dist/*.exe
           if-no-files-found: warn
 

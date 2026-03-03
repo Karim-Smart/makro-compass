@@ -77,15 +77,24 @@ export async function getSubscriptionStatus(): Promise<SubscriptionStatus> {
   } catch (error) {
     console.warn('[SubscriptionAgent] Impossible de vérifier l\'abonnement, mode offline:', (error as Error).message)
 
-    // Mode offline : utiliser le tier 'free' par défaut
-    const rules = QUOTA_RULES.free
-    cachedStatus = {
-      tier: 'free',
-      isActive: true,
-      expiresAt: null,
-      quotaUsed: quota.used,
-      quotaMax: rules.maxPerDay,
-      nextResetAt: quota.resetAt
+    // Mode offline : conserver le dernier tier connu si disponible, sinon fallback free
+    if (cachedStatus) {
+      console.log(`[SubscriptionAgent] Utilisation du cache expiré (tier: ${cachedStatus.tier})`)
+      cachedStatus = {
+        ...cachedStatus,
+        quotaUsed: quota.used,
+        nextResetAt: quota.resetAt,
+      }
+    } else {
+      const rules = QUOTA_RULES.free
+      cachedStatus = {
+        tier: 'free',
+        isActive: true,
+        expiresAt: null,
+        quotaUsed: quota.used,
+        quotaMax: rules.maxPerDay,
+        nextResetAt: quota.resetAt
+      }
     }
   }
 

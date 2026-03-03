@@ -61,7 +61,7 @@ export function BuildStrip({ build, colors }: BuildStripProps) {
 
       {/* Bouton refresh */}
       <button
-        onClick={() => window.overlayAPI.refreshBuild()}
+        onClick={() => window.overlayAPI?.refreshBuild?.()}
         className="mt-auto flex items-center justify-center clip-bevel-sm transition-all"
         title="Recalculer le build"
         style={{

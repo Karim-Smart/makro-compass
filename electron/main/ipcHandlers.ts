@@ -19,7 +19,7 @@ import { canAccess } from '../../shared/feature-gates'
 import { DEV_MOCK_AI, DEV_OVERRIDE_TIER } from '../../shared/constants'
 import type { RankedGame, DraftOracleRequest } from '../../shared/types'
 import { generateRunePages } from '../../shared/rune-data'
-import { getOverlayWindows, setPanelSettings, setOverlayTier } from './windowManager'
+import { getOverlayWindows, setPanelSettings, setOverlayTier, setOverlayPassthrough } from './windowManager'
 
 // ─── Persistance des settings ─────────────────────────────────────────────────
 
@@ -308,10 +308,9 @@ export function setupIpcHandlers(
   })
 
   // Click-through overlay : basculer entre mode interactif et passthrough
+  // Utilise setOverlayPassthrough qui gère les deux modes (ow-electron et standard)
   ipcMain.on(IPC.OVERLAY_MOUSE_IGNORE, (_event, ignore: boolean) => {
-    for (const win of getOverlayWindows()) {
-      win.setIgnoreMouseEvents(ignore, { forward: true })
-    }
+    setOverlayPassthrough(ignore)
   })
 
   // Stripe checkout — ouvre l'URL dans le navigateur

@@ -240,7 +240,8 @@ export function computeInsights(games: RankedGame[]): Insight[] {
     champCounts[g.champion] = (champCounts[g.champion] ?? 0) + 1
   }
   const uniqueChamps = Object.keys(champCounts).length
-  const topChampGames = Math.max(...Object.values(champCounts))
+  const champValues = Object.values(champCounts)
+  const topChampGames = champValues.length > 0 ? Math.max(...champValues) : 0
   if (uniqueChamps > 8 && topChampGames < 3) {
     insights.push({
       type: 'tip', icon: '🎯', priority: 4,

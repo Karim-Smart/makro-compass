@@ -46,10 +46,10 @@ let lastLocalWinProb = 50
  * Plus de facteurs = estimation plus nuancée qu'une simple heuristique.
  */
 function generateLocalWinCondition(gameData: GameData): WinConditionData {
-  const killDiff = gameData.teamKills - gameData.enemyKills
-  const drakeDiff = gameData.objectives.dragonStacks - gameData.objectives.enemyDragonStacks
-  const towerDiff = gameData.towers.enemyDestroyed - gameData.towers.allyDestroyed
-  const goldDiff  = gameData.teamGold - gameData.enemyGold
+  const killDiff = (gameData.teamKills ?? 0) - (gameData.enemyKills ?? 0)
+  const drakeDiff = (gameData.objectives?.dragonStacks ?? 0) - (gameData.objectives?.enemyDragonStacks ?? 0)
+  const towerDiff = (gameData.towers?.enemyDestroyed ?? 0) - (gameData.towers?.allyDestroyed ?? 0)
+  const goldDiff  = (gameData.teamGold ?? 0) - (gameData.enemyGold ?? 0)
   const phase = gameData.gameTime < 840 ? 'early' : gameData.gameTime < 1500 ? 'mid' : 'late'
 
   // ── Score composite pondéré par phase ──
@@ -64,15 +64,15 @@ function generateLocalWinCondition(gameData: GameData): WinConditionData {
 
   // Drakes : avantage cumulatif fort, surtout soul point
   winProb += drakeDiff * 3.5
-  if (gameData.objectives.dragonStacks >= 3) winProb += 5  // soul point bonus
-  if (gameData.objectives.enemyDragonStacks >= 3) winProb -= 5
+  if ((gameData.objectives?.dragonStacks ?? 0) >= 3) winProb += 5  // soul point bonus
+  if ((gameData.objectives?.enemyDragonStacks ?? 0) >= 3) winProb -= 5
 
   // Tours : contrôle de map + gold + vision
   winProb += towerDiff * 2.5
 
   // Objectifs actifs : impact massif mais temporaire
-  if (gameData.objectives.baronActive) winProb += 12
-  if (gameData.objectives.elderActive) winProb += 18
+  if (gameData.objectives?.baronActive) winProb += 12
+  if (gameData.objectives?.elderActive) winProb += 18
 
   // CS/min personnel : indicateur de farm quality (±2%)
   const csMin = gameData.gameTime > 60 ? gameData.cs / (gameData.gameTime / 60) : 0

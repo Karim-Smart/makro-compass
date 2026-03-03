@@ -66,6 +66,7 @@ export default function Dashboard() {
       ? 'Perfect'
       : ((gameData.kda.kills + gameData.kda.assists) / gameData.kda.deaths).toFixed(2)
     : '—'
+  const kdaNum = kdaRatio === 'Perfect' ? Infinity : parseFloat(kdaRatio)
 
   const quotaPct = subStatus?.quotaMax
     ? Math.min(100, (subStatus.quotaUsed / subStatus.quotaMax) * 100)
@@ -192,9 +193,7 @@ export default function Dashboard() {
               label: 'KDA',
               value: `${gameData.kda.kills}/${gameData.kda.deaths}/${gameData.kda.assists}`,
               sub: kdaRatio,
-              accentOverride: gameData.kda.deaths === 0
-                ? '#22c55e'
-                : parseFloat(kdaRatio) >= 4 ? '#22c55e' : parseFloat(kdaRatio) >= 2 ? c.accent : '#ef4444',
+              accentOverride: kdaNum >= 4 ? '#22c55e' : kdaNum >= 2 ? c.accent : '#ef4444',
             },
             { label: 'CS/min', value: csPerMin, sub: `${gameData.cs} CS`, accentOverride: null },
             { label: 'Gold', value: `${(gameData.gold / 1000).toFixed(1)}k`, sub: `${gameData.gold.toLocaleString()}`, accentOverride: null },

@@ -398,6 +398,11 @@ export function getRankedHistory(queueType?: RankedQueueType): RankedGame[] {
       ).all()
     }
 
+    const safeJsonParse = (raw: unknown, fallback: string[] = []): string[] => {
+      try { return JSON.parse(raw as string) as string[] }
+      catch { return fallback }
+    }
+
     return (rows as Array<Record<string, unknown>>).map((row) => ({
       id: row.id as number,
       timestamp: row.timestamp as number,
@@ -413,9 +418,9 @@ export function getRankedHistory(queueType?: RankedQueueType): RankedGame[] {
       enemyKills: row.enemy_kills as number,
       wardScore: row.ward_score as number,
       level: row.level as number,
-      items: JSON.parse(row.items as string) as string[],
-      allies: JSON.parse(row.allies as string) as string[],
-      enemies: JSON.parse(row.enemies as string) as string[],
+      items: safeJsonParse(row.items),
+      allies: safeJsonParse(row.allies),
+      enemies: safeJsonParse(row.enemies),
       result: row.result as 'win' | 'loss',
       role: (row.role as string) || undefined,
       roast: row.roast as string,

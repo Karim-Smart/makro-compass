@@ -25,6 +25,7 @@ let prevCs             = 0
 let prevGameTime       = 0
 let lastGoldTrendAlert = 0    // gameTime du dernier rappel tendance
 let csPmHistory: number[] = [] // CS/min snapshots pour détecter les drops
+let lastCspmSnapshot   = 0    // gameTime du dernier snapshot CS/min
 let lastCsDropAlert    = 0    // gameTime du dernier rappel CS drop
 let prevDeathCount     = -1
 let lastDeathAlert     = 0    // gameTime de la dernière alerte mort
@@ -56,6 +57,7 @@ export function resetAlertEngine(): void {
   prevGameTime     = 0
   lastGoldTrendAlert = 0
   csPmHistory.length = 0
+  lastCspmSnapshot = 0
   lastCsDropAlert  = 0
   prevDeathCount   = -1
   lastDeathAlert   = 0
@@ -241,7 +243,8 @@ export function detectAlerts(gameData: GameData): GameAlert[] {
   if (gameTime >= 300 && gameData.cs > 0) {
     const currentCspm = (gameData.cs / gameTime) * 60
     // Snapshot toutes les ~30s (6 polls à 5s)
-    if (csPmHistory.length === 0 || gameTime - prevGameTime >= 25) {
+    if (csPmHistory.length === 0 || gameTime - lastCspmSnapshot >= 30) {
+      lastCspmSnapshot = gameTime
       csPmHistory.push(currentCspm)
       if (csPmHistory.length > 12) csPmHistory.shift() // ~6 min de données
     }

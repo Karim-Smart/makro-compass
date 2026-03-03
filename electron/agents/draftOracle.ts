@@ -76,8 +76,16 @@ function generateMockDraftResponse(req: DraftOracleRequest): DraftOracleResponse
   // Filtrer les champions déjà pick des suggestions
   const allPicked = [...allyNames, ...enemyNames]
   const available = pool.filter(s => !allPicked.includes(s.champion))
-  // Fallback : si tous les champions du pool sont pris, retourner le pool sans filtre
-  const suggestions = (available.length >= 3 ? available : pool).slice(0, 3)
+  // Toujours prioriser les champions non pickés, compléter avec le pool si insuffisant
+  const suggestions = available.slice(0, 3)
+  if (suggestions.length < 3) {
+    for (const s of pool) {
+      if (suggestions.length >= 3) break
+      if (!suggestions.some(x => x.champion === s.champion)) {
+        suggestions.push(s)
+      }
+    }
+  }
 
   // Analyse contextuelle basée sur la composition
   const ENGAGE_CHAMPS = ['Malphite', 'Leona', 'Nautilus', 'Amumu', 'Jarvan IV', 'Rakan', 'Ornn', 'Sett', 'K\'Sante', 'Sejuani', 'Rell', 'Alistar']

@@ -102,7 +102,7 @@ export function StatsOverlay({ gameData, colors }: Props) {
   const kdaColor = kdaNum >= 4 ? '#22c55e' : kdaNum >= 2 ? colors.text : '#ef4444'
 
   // Gold diff team
-  const goldDiff = gameData.teamGold - gameData.enemyGold
+  const goldDiff = (gameData.teamGold ?? 0) - (gameData.enemyGold ?? 0)
   const goldDiffStr = goldDiff >= 0 ? `+${(goldDiff / 1000).toFixed(1)}k` : `${(goldDiff / 1000).toFixed(1)}k`
   const goldDiffColor = goldDiff >= 0 ? '#22c55e' : '#ef4444'
 

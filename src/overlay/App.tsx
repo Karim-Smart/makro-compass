@@ -109,7 +109,8 @@ export default function OverlayApp() {
     rotateTimerRef.current = setInterval(() => {
       setAdviceQueue((q) => {
         if (q.length <= 1) return q
-        setAdviceIdx((prev) => (prev + 1) % q.length)
+        const len = q.length
+        setAdviceIdx((prev) => (prev + 1) % len)
         setRotateKey((k) => k + 1)
         return q
       })

@@ -159,7 +159,7 @@ function generateErrors(game: RankedGame, stats: ReviewStats): ReviewEvent[] {
   // Défaite serrée
   if (game.result === 'loss' && game.teamKills > game.enemyKills * 0.8) {
     errors.push({
-      gameTimeStart: game.gameTime - 120,
+      gameTimeStart: Math.max(0, game.gameTime - 120),
       gameTimeDuration: 15,
       category: 'error',
       title: 'Défaite serrée',
@@ -245,7 +245,7 @@ function generateStrengths(game: RankedGame, stats: ReviewStats): ReviewEvent[] 
   // Victoire dominante
   if (game.result === 'win' && game.teamKills > game.enemyKills * 1.5) {
     strengths.push({
-      gameTimeStart: game.gameTime - 60,
+      gameTimeStart: Math.max(0, game.gameTime - 60),
       gameTimeDuration: 15,
       category: 'strength',
       title: 'Victoire dominante',
