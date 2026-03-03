@@ -34,25 +34,26 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false   # pas de signature de code
 
-      - name: Upload installer (.exe)
-        uses: actions/upload-artifact@v4
-        with:
-          name: maKro-Compass-Setup
-          path: dist/*.exe
-          if-no-files-found: warn
+      - name: Zip executables (évite le blocage SmartScreen)
+        shell: pwsh
+        run: |
+          Get-ChildItem dist/*.exe | ForEach-Object {
+            $zipName = $_.BaseName + ".zip"
+            Compress-Archive -Path $_.FullName -DestinationPath "dist/$zipName"
+          }
 
-      - name: Upload portable (.exe)
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: maKro-Compass-Portable
-          path: dist/*.exe
+          name: maKro-Compass-Windows
+          path: dist/*.zip
           if-no-files-found: warn
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.exe
+          files: dist/*.zip
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
